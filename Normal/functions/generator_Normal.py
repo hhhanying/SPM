@@ -1,11 +1,13 @@
 import numpy as np
 
-def document_generator(a, rho, T, Lambda, Tau, N, nrare = 0, rare_rate = 0, prob_rate = 0):
+def document_generator(a, rho, T, Lambda, Tau, N, w = None, seed = None):
     '''
     a, rho: corpus-level parameters
     T: transformation matrix. ntopic * K * dg
-    Lambda, Tau: topics. K*d matrix. Lambda are positive.
+    Lambda, Tau: topics. K * d matrix. Lambda are positive.
     N: the number of documents.
+    w: probability of labels
+    seed: random seed number
     
     Lambda = 1/sigma^2
     Tau = mu/sigma^2
@@ -21,22 +23,24 @@ def document_generator(a, rho, T, Lambda, Tau, N, nrare = 0, rare_rate = 0, prob
     G: membership
     U: transformed membership
     '''
+    if not (seed is None): # if random seed is indicated, set seed
+        np.random.seed(seed)
 
     nlabel = len(T) # number of classes
     d = len(Tau[0]) # dim(x)
     
-    Y = np.random.choice(list(range(nlabel)), N) # labels
+    if w is None: # is w is not given, set w to be uniform
+        w = np.ones(nlabel) /  nlabel 
 
-    if prob_rate: # if we want an unbalanced dataset
-        if rare_rate:
-            nrare = int(nlabel * rare_rate)
-        p = np.array([prob_rate] * nrare + [1] * (nlabel - nrare))
-        p = p/p.sum()
-        Y = np.random.choice(list(range(nlabel)), N, p = p) # labels
-        
-    G = np.random.dirichlet(a * rho, N)
-    U = np.array([np.dot(T[Y[i]], G[i]) for i in range(N)])
+    Y = np.random.choice(a = list(range(nlabel)), size = N, replace = True, p = w) # draw labels
+    G = np.random.dirichlet(alpha = a * rho, size = N) # draw memberships
+    U = np.array([np.dot(T[Y[i]], G[i]) for i in range(N)]) # tranform memberships, U is an N * K matrix
 
+    LambdaX = np.dot(U, Lambda)
+    TauX = np.dot(U, Tau)
+    SigmaX = sqrt(1 / LambdaX) 
+    MuX = TauX / LambdaX
 
+    X = np.random.normal(loc = MuX, scale = SigmaX, size = (N, d))
 
     return X, Y, G, U
