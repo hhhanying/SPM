@@ -38,7 +38,7 @@ def document_generator(a, rho, T, Lambda, Tau, N, w = None, seed = None):
 
     LambdaX = np.dot(U, Lambda)
     TauX = np.dot(U, Tau)
-    SigmaX = sqrt(1 / LambdaX) 
+    SigmaX = np.sqrt(1 / LambdaX) 
     MuX = TauX / LambdaX
 
     X = np.random.normal(loc = MuX, scale = SigmaX, size = (N, d))
