@@ -427,6 +427,83 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   res
 }
 
+BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntopic, ntrace, nchain, nskip, seed){
+  BPM_Normal_membership_stancode <-"
+  data {
+      int<lower=0> N;  // size of training set
+      int<lower=0> ntopic;
+      int<lower=0> d; //dim of data
+      
+      real<lower=0> a;
+      simplex[ntopic] rho;
+  
+      matrix[N, d] X;
+
+      matrix[ntopic, d] Lambda;
+      matrix[ntopic, d] Tau;
+  
+  }
+  parameters {
+      simplex[ntopic] U[N];
+  }
+  model{
+      for (i in 1:N){
+          row_vector[d] lambda_X;
+          row_vector[d] tau_X;
+          
+          U[i] ~ dirichlet(a * rho);
+  
+          lambda_X = U[i]' * Lambda;
+          tau_X = U[i]' * Tau;
+  
+          for (j in 1:d){
+              X[i, j] ~ normal(tau_X[j] / lambda_X[j], sqrt(1 / lambda_X[j]));
+          }
+      }
+  }
+  "
+  
+  # calculate needed parameters (avoid too many inputs)
+  N <- dim(X)[1]
+  d <- dim(X)[2]
+  
+  Tau <- Mu * Lambda
+  
+  dat_fit <- list(
+    N = N,
+    ntopic = ntopic,
+    d = d,
+    a = a,
+    rho = rho,
+    X = X,
+    Lambda = Lambda,
+    Tau = Tau
+  )
+  
+  # sampling
+  fit_estimate <-rstan::stan(model_code = BPM_Normal_membership_stancode,
+                             data = dat_fit,
+                             chains = nchain,
+                             iter = ntrace)
+  trace <- as.matrix(fit_estimate)
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  U <- matrix(NA, nrow = N, ncol = ntopic)
+  for (i1 in 1:N){
+    for(i2 in 1:ntopic){
+      varname <- sprintf("G[%s,%s]", i1, i2)
+      U[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  U
+}
+
 get_parameters_Normal <- function(X, Y, G, Ts, Lambda, Mu){
   Tau <- Mu * Lambda
   U <- matrix(NA, nrow = N, ncol = K)
