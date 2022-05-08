@@ -136,11 +136,14 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
                           chains = nchain,
                           iter = ntrace)
   
+  trace <- as.matrix(fit_train)
+  
   # save results
   nsample <- dim(trace)[1]
   nsave <- nsample %/% nskip
   index_save <- (1:nsave) * nskip
-  trace <- as.matrix(fit_train)[index_save,]
+  trace <- trace[index_save,]
+  
   
   res <- list()
   
