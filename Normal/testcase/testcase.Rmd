@@ -1,0 +1,104 @@
+---
+title: "testcase"
+output: html_document
+---
+```{r}
+library("devtools")
+library(roxygen2)
+
+setwd("../..")
+document()
+```
+
+```{r}
+library(tidyverse)
+library(SPM)
+```
+
+```{r}
+# read parameters
+k0 <- 2
+k1 <- 3
+nlabel <- 3
+
+d <- 20
+
+N = 100
+
+mu_Mu = 0
+sigma2_Mu = 50
+alpha_Lambda = 2
+beta_Lambda=4
+
+seed = 1
+
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+b <- 0.1
+alpha <- c(3,3,3,2,2)
+
+Ts <- T_generator(k0, k1, nlabel)
+
+set.seed(seed)
+
+a <- rexp(n = 1, rate = b)
+rho <- gtools::rdirichlet(n = 1, alpha = alpha)
+
+Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
+  matrix(nrow = K)
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
+  }
+}
+Tau <- Mu * Lambda
+
+ntrace <- 2000
+nchain <- 2
+nskip <- 2
+nsample <- 1000
+```
+
+#### simulating data
+
+```{r}
+dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
+```
+
+
+#### training
+
+```{r}
+res <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
+```
+
+#### predicting
+
+```{r}
+prediction <- SPM_predicting_Normal(dat[["X"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts, nsample, seed, w = NULL) # with results
+sum(prediction[["labels"]] == dat[["Y"]])
+prediction2 <- SPM_predicting_Normal(dat[["X"]], Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL) # with true parameters
+sum(prediction2[["labels"]] == dat[["Y"]])
+```
+
+#### estimating memberships
+
+```{r}
+m1 <- SPM_membership_Normal(dat[["X"]], prediction[["labels"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts,  2000, 2, nskip, seed)
+m2 <- SPM_membership_Normal(dat[["X"]], dat[["Y"]], Lambda, Mu, a, as.vector(rho), Ts, 2000, 1, nskip, seed)
+```
+
+```{r}
+corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
+corrplot::corrplot(cor(t(dat[["X"]])))
+corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts))))
+corrplot::corrplot(cor(t(U(m2, prediction[['labels']], Ts))))
+```
+
+```{r}
+save.image("./testcase.Rdata")
+```
+
