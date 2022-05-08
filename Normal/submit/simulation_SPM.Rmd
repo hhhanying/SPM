@@ -1,0 +1,65 @@
+---
+title: "simulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Input: configuration id, configuration file names, output file names
+# we will read from the configuration file:
+#   hyperparameters: mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, b, alpha
+#   factors: d, k0, k1, nlabel
+#   sampling: ntrace, nchain, nskip, nsample
+#   samplesize: Ntrain Ntest (no CV)
+#   seed
+# w?
+
+```
+```{r}
+library(tidyverse)
+```
+
+```{r}
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+Ts <- T_generator(k0, k1, nlabel)
+
+a <- rexp(n = 1, rate = b)
+rho <- gtools::rdirichlet(n = 1, alpha = alpha)
+
+Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
+  matrix(nrow = K)
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
+  }
+}
+Tau <- Mu * Lambda
+```
+
+
+```{r}
+# simulate data
+training <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntrain, NULL, seed)
+testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, NULL, seed)
+
+# fit the model
+estimate <- SPM_training_Normal(training[["X"]], training[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
+
+# predict the labels
+prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed, w = NULL) 
+
+accuracy <- sum(prediction[["labels"]] == testing[["Y"]])
+
+# save image
+```
+
+
+
+
