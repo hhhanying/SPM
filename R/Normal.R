@@ -206,7 +206,7 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
   list(posterior = probs, labels = Y)
 }
 
-SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip, seed, w = NULL){
+SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip, seed){
   SPM_Normal_membership_stancode <-"
   data {
       int<lower=0> dg;  // dim(membership)
