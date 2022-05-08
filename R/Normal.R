@@ -212,8 +212,7 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
 }
 
 SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip, seed, w = NULL){
-  for (i in 1:3){
-    SPM_Normal_membership_stancode <-"
+  SPM_Normal_membership_stancode <-"
   data {
       int<lower=0> dg;  // dim(membership)
       int<lower=0> N;  // size of training set
@@ -255,7 +254,6 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, 
       }
   }
   "
-  }
   
   # calculate needed parameters (avoid too many inputs)
   N <- length(Y)
