@@ -211,3 +211,99 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
   list(posterior = probs, labels = Y)
 }
 
+SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL){
+  for (i in 1:3){
+    SPM_Normal_membership_stancode <-"
+  data {
+      int<lower=0> dg;  // dim(membership)
+      int<lower=0> N;  // size of training set
+      int<lower=0> nlabel;
+      int<lower=0> ntopic;
+      int<lower=0> d; //dim of data
+      
+      real<lower=0> a;
+      simplex[dg] rho;
+  
+      matrix[N, d] X;
+      int<lower=1> Y[N];         // label, start from 1 
+  
+      matrix[ntopic, dg] T[nlabel];
+      
+  
+      matrix[ntopic, d] Lambda;
+      matrix[ntopic, d] Tau;
+  
+  }
+  parameters {
+      simplex[dg] G[N];
+  }
+  model{
+      for (i in 1:N){
+          vector[ntopic] u;
+          row_vector[d] lambda_X;
+          row_vector[d] tau_X;
+          
+          G[i] ~ dirichlet(a * rho);
+          u = T[Y[i]] * G[i];
+  
+          lambda_X = u' * Lambda;
+          tau_X = u' * Tau;
+  
+          for (j in 1:d){
+              X[i, j] ~ normal(tau_X[j] / lambda_X[j], sqrt(1 / lambda_X[j]));
+          }
+      }
+  }
+  "
+  }
+  
+  # calculate needed parameters (avoid too many inputs)
+  N <- length(Y)
+  nlabel <- dim(Ts)[1]
+  dg <- dim(Ts)[3]
+  ntopic <- dim(Ts)[2]
+  d <- dim(X)[2]
+  
+  Tau <- Mu * Lambda
+  
+  dat_fit <- list(
+    dg = dg,
+    N = N,
+    nlabel = nlabel,
+    ntopic = ntopic,
+    d = d,
+    
+    a = a,
+    rho = rho,
+    
+    X = X,
+    Y = Y,
+    
+    T = Ts,
+    Lambda = Lambda,
+    Tau = Tau
+  )
+  
+  # sampling
+  fit_estimate <-rstan::stan(model_code = SPM_Normal_membership_stancode,
+                             data = dat_fit,
+                             chains = nchain,
+                             iter = ntrace)
+  trace <- as.matrix(fit_estimate)
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  G <- matrix(NA, nrow = N, ncol = dg)
+  for (i1 in 1:N){
+    for(i2 in 1:dg){
+      varname <- sprintf("G[%s,%s]", i1, i2)
+      G[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  G
+}
