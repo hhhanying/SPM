@@ -21,6 +21,15 @@ trans_to_matrix <- function(x, d1, d2, byfeature = TRUE){
   return(matrix(rep(x, d2), nrow = d1, byrow = FALSE))
 }
 
-
+# Generate transformed memberships
+U <- function(G, Y, Ts){
+  N <- length(Y)
+  K <- dim(Ts)[2]
+  U <- matrix(NA, nrow = N, ncol = K)
+  for (i in 1:N){
+    U[i,] <- Ts[Y[i], ,] %*% G[i,]
+  }
+  U
+}
 
 
