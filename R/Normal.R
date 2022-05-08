@@ -358,7 +358,7 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   "
   
   # calculate needed parameters (avoid too many inputs)
-  N <- length(Y)
+  N <- dim(X)[1]
   d <- dim(X)[2]
   
   # we assume all hyperparameters for topics are matrices, if they are not, we will duplicate it to make a matrix
