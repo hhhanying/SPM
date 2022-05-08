@@ -53,7 +53,7 @@ testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, NULL, seed)
 estimate <- SPM_training_Normal(training[["X"]], training[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
 
 # predict the labels
-prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed, w = NULL) 
+prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed) 
 
 accuracy <- sum(prediction[["labels"]] == testing[["Y"]])
 
