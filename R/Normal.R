@@ -62,27 +62,38 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
   }
   model{
     matrix[ntopic, d] Tau;
-    vector[ntopic] U[N];
-    row_vector[d] lambda_X[N];
-    row_vector[d] tau_X[N];
+    matrix[N, ntopic] U;
+    matrix[N, d] lambda_X;
+    matrix[N, d] Tau_X;
+    //vector[ntopic] U[N];
+    //row_vector[d] lambda_X[N];
+    //row_vector[d] tau_X[N];
     
     a ~ exponential(b);
     rho ~ dirichlet(alpha);
 
     // topics
-    for (i in 1:ntopic){
-      Lambda[i] ~ gamma(alpha_Lambda[i], beta_Lambda[i]);
-      Mu[i] ~ normal(mu_Mu[i], sqrt(sigma2_Mu[i] ./ Lambda[i]));
-      Tau[i] = Mu[i] .* Lambda[i];
-    }
+    to_vector(Lambda) ~ gamma(to_vector(alpha_Lambda), to_vector(beta_Lambda))
+    to_vector(Mu) ~ normal(to_vector(mu_Mu), sqrt(to_vector(sigma2_Mu) ./ to_vector(Lambda)));
+    Tau = Mu .* lambda
+    //for (i in 1:ntopic){
+    //  Lambda[i] ~ gamma(alpha_Lambda[i], beta_Lambda[i]);
+    //  Mu[i] ~ normal(mu_Mu[i], sqrt(sigma2_Mu[i] ./ Lambda[i]));
+     // Tau[i] = Mu[i] .* Lambda[i];
+    //}
     
     for(i in 1:N){
       G[i] ~ dirichlet(a * rho);
-      U[i] = T[Y[i]] * G[i];
-      lambda_X[i] = U[i]' * Lambda;
-      tau_X[i] = U[i]' * Tau;
-      X[i] ~ normal(tau_X[i] ./ lambda_X[i], sqrt(1 ./ lambda_X[i]));
+      U[i] = (T[Y[i]] * G[i])';
+      //lambda_X[i] = U[i]' * Lambda;
+      //tau_X[i] = U[i]' * Tau;
+      //X[i] ~ normal(tau_X[i] ./ lambda_X[i], sqrt(1 ./ lambda_X[i]));
     }
+    
+    lambda_X = U * Lambda
+    tau_X = U * Tau
+    to_vector(X) ~ normal(to_vector(tau_X ./ lambda_X), to_vector(sqrt(1 ./ lambda_X)))
+    
 
   }
   "
