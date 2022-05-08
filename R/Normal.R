@@ -201,7 +201,7 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
       x <- matrix(rep(X[i,], nsample), nrow = nsample, byrow = TRUE)
       p_matrix <- dnorm(x = x, mean = MuX, sd = sqrt(1 / LambdaX), log = TRUE) # get the nsample * d logP matrix
       logps <- apply(p_matrix, 1, sum) # row sum: logP for each G
-      probs[i, y] <- matrixStats::logSumExp(logps) + log(w[i]) # should actually - log(nsample)
+      probs[i, y] <- matrixStats::logSumExp(logps) + log(w[y]) # should actually - log(nsample)
       
     }
     
