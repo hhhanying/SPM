@@ -427,7 +427,7 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   res
 }
 
-BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntopic, ntrace, nchain, nskip, seed){
+BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip, seed){
   BPM_Normal_membership_stancode <-"
   data {
       int<lower=0> N;  // size of training set
@@ -466,7 +466,7 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntopic, ntrace, nchain,
   # calculate needed parameters (avoid too many inputs)
   N <- dim(X)[1]
   d <- dim(X)[2]
-  
+  ntopic <- dim(Lambda)[1]
   Tau <- Mu * Lambda
   
   dat_fit <- list(
