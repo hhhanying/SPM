@@ -104,10 +104,14 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
   d <- dim(X)[2]
   
   # we assume all hyperparameters for topics are matrices, if they are not, we will duplicate it to make a matrix
-  mu_Mu = SPM::trans_to_matrix(mu_Mu, ntopic, d)
-  sigma2_Mu = SPM::trans_to_matrix(sigma2_Mu, ntopic, d)
-  alpha_Lambda = SPM::trans_to_matrix(alpha_Lambda, ntopic, d)
-  beta_Lambda = SPM::trans_to_matrix(beta_Lambda, ntopic, d)
+  # mu_Mu = SPM::trans_to_matrix(mu_Mu, ntopic, d)
+  # sigma2_Mu = SPM::trans_to_matrix(sigma2_Mu, ntopic, d)
+  # alpha_Lambda = SPM::trans_to_matrix(alpha_Lambda, ntopic, d)
+  # beta_Lambda = SPM::trans_to_matrix(beta_Lambda, ntopic, d)
+  mu_Mu = trans_to_matrix(mu_Mu, ntopic, d)
+  sigma2_Mu = trans_to_matrix(sigma2_Mu, ntopic, d)
+  alpha_Lambda = trans_to_matrix(alpha_Lambda, ntopic, d)
+  beta_Lambda = trans_to_matrix(beta_Lambda, ntopic, d)
   
   # the data to fit
   dat_fit <- list(
