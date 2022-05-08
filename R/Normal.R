@@ -307,3 +307,18 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, nsample, seed, w
   
   G
 }
+
+get_parameters_Normal <- function(X, Y, G, Ts, Lambda, Mu){
+  Tau <- Mu * Lambda
+  U <- matrix(NA, nrow = N, ncol = K)
+  for (i in 1:N){
+    U[i,] <- Ts[Y[i], ,] %*% G[i,]
+  }
+  
+  LambdaX <- U %*% Lambda
+  TauX <- U %*% Tau
+  SigmaX <- sqrt(1 / LambdaX) 
+  MuX <- TauX / LambdaX  
+  
+  list(MuX = MuX, LambdaX = LambdaX, SigmaX = SigmaX, MuX = MuX)
+}
