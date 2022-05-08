@@ -2,16 +2,19 @@ import numpy as np
 import pymc3 as pm
 import theano
 
-def train_supervised(X, Y, K, b, alpha, T, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip):
+def train_supervised(X, Y, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, T, ntrace, nchain, nskip):
     '''
     Given training set and hyperparameters, estimate the parameters of the model.
 
     X, Y: training set
-    K: total topic numbers
+
     b, alpha: hyperparameters for the prior of a and rho
-    T: transformation matrix
+    
     mu_Mu, sigma2_Mu: the prior of Mu is N(mu_Mu, sigma2_Mu/Lambda)
     alpha_Lambda, beta_Lambda: the prior of Lambda is Gamma(alpha_Lambda, beta_Lambda)
+
+    T: transformation matrix. A list of np arrays.
+
     ntrace, nchain, nskip: parameters of sampling
 
     output: a directionary.
@@ -21,6 +24,7 @@ def train_supervised(X, Y, K, b, alpha, T, mu_Mu, sigma2_Mu, alpha_Lambda, beta_
 
     N = len(Y) # sample size
     dg = len(alpha) # dim(untransformed membership)
+    K = len(T[0])
     d = len(X[0]) # dim(x)
     T_arr = np.array(T) # nlabel * K * dg
 
