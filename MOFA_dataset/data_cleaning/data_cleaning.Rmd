@@ -1,0 +1,107 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(purrr)
+library(ggplot2)
+library(ggpubr)
+library(MOFA2)
+```
+
+```{r}
+dt <- fread("ftp://ftp.ebi.ac.uk/pub/databases/mofa/microbiome/data.txt.gz")
+metadata <- fread("ftp://ftp.ebi.ac.uk/pub/databases/mofa/microbiome/metadata.txt.gz")
+```
+
+```{r}
+dim(dt)
+colnames(dt)
+dim(metadata)
+colnames(metadata)
+```
+
+We will choose Category as labels and use transformed relative abundance as features.
+
+```{r}
+table(metadata$Category)
+unique(metadata$Category)
+metadata <- metadata %>% mutate(Category = factor(Category, levels = c("Sepsis", "Non septic ICU", "Healthy, no antibiotics", "Healthy, antibiotics")))
+```
+
+
+### delete missing data
+```{r}
+microbiome <- pivot_wider(dt, id_cols = "sample", names_from = "feature", values_from = "value")
+missing_i <- c()
+missing_j <- c()
+for(i in 1:dim(microbiome)[1]){
+  for(j in which(is.na(microbiome[i,]))){
+    missing_i <- c(missing_i, i)
+    missing_j <- c(missing_j, j)
+  }
+}
+print( missing_i)
+print(missing_j)
+```
+
+```{r}
+missing_sample <- microbiome$sample[unique(missing_i)]
+microbiome <- microbiome[-missing_i,]
+metadata <- metadata %>% filter(!(sample %in% missing_sample))
+```
+
+### sort sample by Category
+```{r}
+metadata <- metadata %>% arrange(Category)
+microbiome <- microbiome %>%
+  mutate(sample = factor(sample, levels = metadata$sample)) %>%
+  arrange(sample)
+factor(metadata$sample, levels = metadata$sample) == microbiome$sample
+```
+
+### joint data
+```{r}
+joint_data <- merge(microbiome, metadata[,c("sample", "Category")], by = "sample") %>%
+   arrange(sample)
+```
+
+### get microbiome info
+```{r}
+microbiome_info <- unique(dt[, c("feature", "view")])
+```
+
+
+### save all results
+```{r}
+dat_dir <- "../derived_data/"
+if(!dir.exists(dat_dir)) dir.create(dat_dir)
+
+write.table(x = microbiome, file = paste0(dat_dir, "microbiome.csv"), sep = ',', row.names = FALSE)
+write.table(x = metadata, file = paste0(dat_dir, "metadata.csv"), sep = ',', row.names = FALSE)
+write.table(x = joint_data, file = paste0(dat_dir, "joint_data.csv"), sep = ',', row.names = FALSE)
+write.table(x = microbiome_info, file = paste0(dat_dir, "microbiome_info.csv"), sep = ',', row.names = FALSE)
+```
+
+
+```{r, echo = FALSE}
+which(colnames(microbiome) !=colnames(microbiome2))
+for(i in 1:241){
+  if(!identical(microbiome[[i]], microbiome2[[i]])){
+    print(i)
+  }
+}
+
+
+```
+
+
+
+
+
