@@ -68,6 +68,7 @@ nsample <- 1000
 dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
 ```
 
+### SPM
 
 #### training
 
@@ -80,6 +81,7 @@ res <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_M
 ```{r}
 prediction <- SPM_predicting_Normal(dat[["X"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts, nsample, seed, w = NULL) # with results
 sum(prediction[["labels"]] == dat[["Y"]])
+
 prediction2 <- SPM_predicting_Normal(dat[["X"]], Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL) # with true parameters
 sum(prediction2[["labels"]] == dat[["Y"]])
 ```
@@ -88,17 +90,42 @@ sum(prediction2[["labels"]] == dat[["Y"]])
 
 ```{r}
 m1 <- SPM_membership_Normal(dat[["X"]], prediction[["labels"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts,  2000, 2, nskip, seed)
-m2 <- SPM_membership_Normal(dat[["X"]], dat[["Y"]], Lambda, Mu, a, as.vector(rho), Ts, 2000, 1, nskip, seed)
+#m2 <- SPM_membership_Normal(dat[["X"]], dat[["Y"]], Lambda, Mu, a, as.vector(rho), Ts, 2000, 1, nskip, seed)
 ```
 
 ```{r}
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
 corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts))))
-corrplot::corrplot(cor(t(U(m2, prediction[['labels']], Ts))))
+# corrplot::corrplot(cor(t(U(m2, prediction[['labels']], Ts))))
 ```
 
 ```{r}
 save.image("./testcase.Rdata")
 ```
 
+
+### BPM
+```{r}
+res_BPM <- BPM_training_Normal(dat[['X']], b, rep(1, ntopic), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip)
+```
+
+```{r}
+corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
+corrplot::corrplot(cor(t(dat[["X"]])))
+corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts)))) # spm
+corrplot::corrplot(cor(t(res_BPM[["U"]]))) # BPM
+```
+
+
+```{r}
+### test SVM
+library(e1071)
+f1 <- svm(factor(dat[["Y"]]) ~ res_BPM[["U"]])
+l1 <- predict(f1, res_BPM[["U"]])
+sum(l1 == factor(dat[["Y"]]))
+```
+
+```{r}
+save.image("./testcase.Rdata")
+```
