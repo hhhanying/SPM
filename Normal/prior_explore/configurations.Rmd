@@ -35,8 +35,11 @@ for (d in c(50, 200, 800)){
 confi <- data.frame(d = ds, k0 = k0s, k1 = k1s, seed = 1:length(ds))
 
 weight_shared <- c(0.5, 0.2)
+weight_shared <- c(0.5)
 balanced <- c("balanced", "unbalanced")
+balanced <- c("balanced")
 sigma2_Mu <- c(1, 10, 50)
+sigma2_Mu <- c(1, 10)
 model <- c("SPM", "BPM")
 
 C <- 20
