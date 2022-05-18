@@ -206,7 +206,7 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
   list(posterior = probs, labels = Y)
 }
 
-SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip, seed){
+SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip){
   SPM_Normal_membership_stancode <-"
   data {
       int<lower=0> dg;  // dim(membership)
@@ -427,7 +427,7 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   res
 }
 
-BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip, seed){
+BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip){
   BPM_Normal_membership_stancode <-"
   data {
       int<lower=0> N;  // size of training set
