@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # w?
 
 confi_file <- "configurations.csv"
-confi_index <- params$confi_index
+confi_index <- as.numeric(params$confi_index)
 confi <- read.csv(confi_file)
 ```
 ```{r}
@@ -136,7 +136,7 @@ if (model == "SPM"){
   save.image(image_name)
 } else{
   # fit the model
-  estimate <- BPM_training_Normal(training[["X"]], b, rep(1, K), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic_fit, ntrace, nchain, nskip)
+  estimate <- BPM_training_Normal(training[["X"]], b, rep(1, K), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip)
   save.image(image_name)
   # estimate memberships for test set
   U <- BPM_membership_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], ntrace, nchain, nskip)
