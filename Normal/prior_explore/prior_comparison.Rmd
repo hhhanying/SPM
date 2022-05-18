@@ -1,0 +1,316 @@
+---
+title: "prior"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Find appropriate b. Find appropriate b and alpha for training.
+2. Find appropriate prior for topics.
+
+```{r}
+library(tidyverse)
+```
+
+### corpus memberships
+
+Find appropriate b (expectation of a) for generating data. We want b large enough to generate relative balanced memberships. Otherwise, no need to increase topic number.
+
+```{r}
+d <- 800
+weight_shared <- 0.5
+nlabel <- 5
+```
+```{r}
+# 1. keep E(a) / (k0 + k1) constant
+# 2. keep E(a) / 2k0 constant
+# 3. keep E(a) / 2k1 constant
+# comparison
+for(k0 in seq(5, 31, by = 5)){
+
+  k1 <- (d * 0.2) - nlabel * k0
+  set.seed(0)
+  
+  C <- 10
+  print(k0)
+  for(b in c(1 / ((k0 + k1) * C), 1 / (2 * k0 * C), 1 / (2 * k1 * C))){
+    nsample <- 200
+    
+    Gs <- matrix(NA, nrow = nsample, ncol = k0 + k1)
+    for(i in 1:nsample){
+      a <- rexp(n = 1, rate = b)
+      rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+      rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))  
+      rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+      Gs[i,] <- gtools::rdirichlet(n = 1, alpha = a * rho)
+    }
+    
+    p <- as.data.frame(Gs) %>%
+      pivot_longer(cols = everything(), names_to = "t", values_to = "va") %>%
+      ggplot(aes(x = t, y = va)) +
+      geom_boxplot()
+    print(p)
+    p <- as.data.frame(Gs) %>%
+      mutate(sample = 1:200) %>%
+      pivot_longer(cols = !sample, names_to = "t", values_to = "va", names_prefix = "V") %>%
+      arrange(t) %>%
+      ggplot(aes(x = t, y = va, group = sample)) +
+      geom_path()
+    print(p)
+  }
+}
+```
+```{r}
+# 1. keep E(a) / (k0 + k1) constant
+# 2. keep E(a) / 2k0 constant
+# 3. keep E(a) / 2k1 constant
+# comparison
+for(k0 in seq(5, 31, by = 5)){
+
+  k1 <- (d * 0.2) - nlabel * k0
+  set.seed(0)
+  
+  C <- 50
+  print(k0)
+  for(b in c(1 / ((k0 + k1) * C), 1 / (2 * k0 * C), 1 / (2 * k1 * C))){
+    nsample <- 200
+    
+    Gs <- matrix(NA, nrow = nsample, ncol = k0 + k1)
+    for(i in 1:nsample){
+      a <- rexp(n = 1, rate = b)
+      rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+      rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))  
+      rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+      Gs[i,] <- gtools::rdirichlet(n = 1, alpha = a * rho)
+    }
+    
+    p <- as.data.frame(Gs) %>%
+      pivot_longer(cols = everything(), names_to = "t", values_to = "va") %>%
+      ggplot(aes(x = t, y = va)) +
+      geom_boxplot()
+    print(p)
+    p <- as.data.frame(Gs) %>%
+      mutate(sample = 1:200) %>%
+      pivot_longer(cols = !sample, names_to = "t", values_to = "va", names_prefix = "V") %>%
+      arrange(t) %>%
+      ggplot(aes(x = t, y = va, group = sample)) +
+      geom_path()
+    print(p)
+  }
+}
+```
+
+We decide to choose $\frac{E(a)}{k_0+Kk_1}=C$ to make sure all topics are uniform enough.
+
+### alpha
+```{r}
+d <- 800
+weight_shared <- 0.5
+nlabel <- 5
+```
+```{r}
+k0 = 10
+  k1 <- (d * 0.2) - nlabel * k0
+  set.seed(0)
+  nsample <- 200
+  rhos <- matrix(NA, nrow = nsample, ncol = k0 + k1)
+  rhos[1:nsample,1:k0] <- gtools::rdirichlet(n = nsample, alpha = rep(1, k0)) * (1 - weight_shared)
+  rhos[1:nsample, (k0 + 1):(k0 + k1)] <- gtools::rdirichlet(n = nsample, alpha = rep(1, k1)) * weight_shared
+  
+  alpha0 <- c(rep(1 / k0, k0) * (1 - weight_shared), rep(1 / k1, k1) * weight_shared)
+  rhos2 <- gtools::rdirichlet(n = nsample, alpha = alpha0)
+apply(rhos, 2, mean)
+apply(rhos2, 2, mean)
+sum(apply(rhos, 2, mean)[1:k0])
+sum(apply(rhos2, 2, mean)[1:k0])
+```
+
+1st idea: still learn with (1, 1, ...). Although this prior doesn't capture the weight, but it puts no preference.
+
+### training setting: supervised
+
+```{r}
+k0 = 10
+ k1 <- (d * 0.2) - nlabel * k0
+  set.seed(0)
+  
+  C <- 50
+  print(k0)
+ 
+  nsample <- 200
+  rhos <- matrix(NA, nrow = nsample, ncol = k0 + k1)
+  rhos[1:nsample,1:k0] <- gtools::rdirichlet(n = nsample, alpha = rep(1, k0)) * (1 - weight_shared)
+  rhos[1:nsample, (k0 + 1):k1] <- gtools::rdirichlet(n = nsample, alpha = rep(1, k0)) * weight_shared
+  
+ 
+      
+```
+
+```{r}
+for(k0 in seq(5, 31, by = 5)){
+
+  k1 <- (d * 0.2) - nlabel * k0
+  set.seed(0)
+  
+  C <- 50
+  print(k0)
+ 
+  rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+      rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))  
+      rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+
+    
+   
+    
+    p <- as.data.frame(Gs) %>%
+      pivot_longer(cols = everything(), names_to = "t", values_to = "va") %>%
+      ggplot(aes(x = t, y = va)) +
+      geom_boxplot()
+    print(p)
+    p <- as.data.frame(Gs) %>%
+      mutate(sample = 1:200) %>%
+      pivot_longer(cols = !sample, names_to = "t", values_to = "va", names_prefix = "V") %>%
+      arrange(t) %>%
+      ggplot(aes(x = t, y = va, group = sample)) +
+      geom_path()
+    print(p)
+  
+}
+```
+
+
+
+### topics
+```{r}
+ntopic <- 30
+K <- ntopic
+d <- 3
+alpha_Lambda <- 1
+beta_Lambda <- 2
+mu_Mu <- 0
+sigma2_Mu <- 10
+Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
+  matrix(nrow = K)
+
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
+  }
+}
+nsample <- 30
+X <- matrix(NA, nrow = K * nsample, ncol = d)
+for(i in 1:K){
+  e <- i * nsample
+  s <- e - nsample + 1
+  for(j in 1:d){
+    X[s:e, j] <- rnorm(n = nsample, mean = Mu[i, j], sd = sqrt(1/Lambda[i,j]))  
+  }
+}
+
+as.data.frame(X) %>%
+  mutate(topic = rep(1:K, each = nsample)) %>%
+  ggplot(aes(x = V1, y = V2, color = factor(topic))) +
+  geom_point()
+
+############
+sigma2_Mu <- 100
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
+  }
+}
+nsample <- 30
+X <- matrix(NA, nrow = K * nsample, ncol = d)
+for(i in 1:K){
+  e <- i * nsample
+  s <- e - nsample + 1
+  for(j in 1:d){
+    X[s:e, j] <- rnorm(n = nsample, mean = Mu[i, j], sd = sqrt(1/Lambda[i,j]))  
+  }
+}
+
+as.data.frame(X) %>%
+  mutate(topic = rep(1:K, each = nsample)) %>%
+  ggplot(aes(x = V1, y = V2, color = factor(topic))) +
+  geom_point()
+# Tau <- Mu * Lambda
+# plot(Mu[,1], Mu[,2])
+# as.data.frame(Mu) %>%
+#   ggplot(aes(x = V1, y = V2, size =))
+```
+### choose topic prior
+```{r}
+alpha_Lambda <- 2
+beta_Lambda <- 4
+mu_Mu <- 0
+sigma2_Mu <- 1
+nd <- seq(0.01, 2, by = 0.05)
+plot(nd, dgamma(nd, alpha_Lambda, rate = beta_Lambda))
+nd <- seq(1, 20, by = 0.2)
+plot(nd, dgamma(1/nd, alpha_Lambda, rate = beta_Lambda)/nd/nd)
+```
+
+```{r}
+source("../../R/shared.R")
+source("../../R/Normal.R")
+d <- 800
+weight_shared <- 0.5
+nlabel <- 5
+k0 = 10
+ k1 <- (d * 0.2) - nlabel * k0
+ 
+ seed <- 2022
+ 
+ dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+Ts <- T_generator(k0, k1, nlabel)
+
+set.seed(seed)
+
+# sample parameters
+b <- 20 / (k0 + k1)
+a <- rexp(n = 1, rate = b)
+
+rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))
+rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+
+Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
+  matrix(nrow = K)
+
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
+  }
+}
+Mu <- Mu * sqrt(10)
+Tau <- Mu * Lambda
+
+dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, 200, NULL, seed)
+
+```
+
+
+```{r}
+d1 <- 1
+d2 <- 2
+dat$X[,c(d1, d2)] %>% as.data.frame() %>%
+  mutate(label = factor(dat$Y)) %>%
+  ggplot(aes(x = V1, y = V2, color = label)) +
+  geom_point()
+
+prediction <- SPM_predicting_Normal(dat$X[1:100,], Lambda, Mu, a, rho, Ts, 500, seed) 
+
+accuracy <- sum(prediction[["labels"]] == dat[["Y"]][1:100])
+accuracy # 0.94 for 1, 0.96 for 10
+```
+
+
+

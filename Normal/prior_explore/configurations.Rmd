@@ -1,0 +1,60 @@
+---
+title: "configurations"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+parameters:
+
+Fix nlabel = 5, nlabel * k0 + k1 = 0.2 * d.  
+
+Try:
+ - d = 50, 200, 800 
+ - 1 / b = 20 * (k0 + k1) (E(membership) * E(a) >= 10)
+ - weight_shared = 0.5, 0.2 
+ - sigma2_Mu <- c(1, 10, 50)
+ - balanced = balanced or unbalanced
+
+
+```{r}
+nlabel <- 5
+topic_d_ratio <- 0.2
+ds <- c()
+k0s <- c()
+k1s <- c()
+for (d in c(50, 200, 800)){
+  K <- floor(d * topic_d_ratio) # number of total topics
+  max_k0 <- K %/% nlabel
+  ds <- c(ds, rep(d, max_k0))
+  k0s <- c(k0s, 1:max_k0)
+  k1s <- c(k1s, seq(K - nlabel, 0, by = -5))
+}
+confi <- data.frame(d = ds, k0 = k0s, k1 = k1s, seed = 1:length(ds))
+
+weight_shared <- c(0.5, 0.2)
+balanced <- c("balanced", "unbalanced")
+sigma2_Mu <- c(1, 10, 50)
+model <- c("SPM", "BPM")
+
+C <- 20
+confi <- expand_grid(confi, weight_shared, balanced, sigma2_Mu, model)
+confi <- confi %>%
+  mutate(b = 1 / C / (k0 + k1),
+         mu_Mu = 0,
+         alpha_Lambda = 2,
+         beta_Lambda = 4,
+         nlabel = 5
+         ) %>%
+  arrange(d)
+```
+
+```{r}
+confi_path <- "../submit/configurations.csv"
+write.table(confi, file = confi_path, sep=",", row.names=FALSE)
+```
+
+
+
