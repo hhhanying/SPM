@@ -2,7 +2,6 @@
 title: "simulation"
 output: html_document
 params:
-  confi_file: "configurations.csv"
   confi_index: 1
 ---
 
@@ -20,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #   seed
 # w?
 
-confi_file <- params$confi_file
+confi_file <- "configurations.csv"
 confi_index <- params$confi_index
 confi <- read.csv(confi_file)
 ```
