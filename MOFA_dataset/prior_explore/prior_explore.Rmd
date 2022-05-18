@@ -1,0 +1,115 @@
+---
+title: "prior_explore"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(purrr)
+library(ggplot2)
+library(ggpubr)
+library(MOFA2)
+library(tidyverse)
+dt <- fread("ftp://ftp.ebi.ac.uk/pub/databases/mofa/microbiome/data.txt.gz")
+metadata <- fread("ftp://ftp.ebi.ac.uk/pub/databases/mofa/microbiome/metadata.txt.gz")
+```
+```{r}
+microbiome <- read.table("../derived_data/microbiome.csv", sep = ',', header = TRUE, check.names = FALSE)
+micro_info <- read.csv("../derived_data/microbiome_info.csv")
+bacteria <- microbiome_info$feature[microbiome_info$view == "Bacteria"]
+fungi <- microbiome_info$feature[microbiome_info$view == "Fungi"]
+viruses<- microbiome_info$feature[microbiome_info$view == "Viruses"]
+```
+
+
+```{r}
+dt <- merge(dt, metadata[,c("sample", "Category")])
+# dt %>% ggplot(aes(x = value, fill = view)) +
+#   geom_density() +
+#   facet_grid(Category~.)
+# taxon <- unique(dt$feature)
+# dt %>% filter(feature %in% taxon[sample(1:240, 10)]) %>%
+#   ggplot(aes(x = value, fill = Category)) +
+#   geom_density() +
+#   facet_grid(feature ~ .)
+# dt %>% filter(view == "Fungi") %>%
+#   ggplot(aes(x = value, fill = Category)) +
+#   geom_density() +
+#   facet_grid(feature ~ .)
+# dt %>% filter(view == "Viruses") %>%
+#   ggplot(aes(x = value, fill = Category)) +
+#   geom_density() +
+#   facet_grid(feature ~ .)
+```
+```{r}
+
+
+```
+
+
+
+```{r}
+for (view in unique(dt$view)){
+  taxa <- microbiome_info$feature[microbiome_info$view == view]
+  dat <- microbiome[, taxa]
+  means <- apply(dat, 1, mean)
+  vars <- apply(dat, 1, var)
+  lambdas <- 1 / vars
+  # MOM gamma
+  beta_l <- mean(lambdas) / var(lambdas)
+  alpha_l <- mean(lambdas) * beta_l
+  print(beta_l)
+  print(alpha_l) 
+  nd <- seq(0.001, 0.5, by = 0.01)
+  plot(nd, dgamma(nd, shape = alpha_l, rate = beta_l))
+  hist(lambdas, breaks = 50)
+}
+```
+```{r}
+lambdas <- lambdas[which(lambdas<6)]
+beta_l <- mean(lambdas) / var(lambdas)
+alpha_l <- mean(lambdas) * beta_l
+nd <- seq(0.001, 3, by = 0.01)
+plot(nd, dgamma(nd, shape = alpha_l, rate =  beta_l))
+hist(lambdas, breaks = 50)
+print(c(alpha_l, beta_l))
+```
+```{r}
+view <- "Bacteria"
+
+taxa <- microbiome_info$feature[microbiome_info$view == view]
+dat <- microbiome[, taxa]
+means <- apply(dat, 1, mean)
+vars <- apply(dat, 1, var)
+lambdas <- 1 / vars
+
+# MOM gamma
+beta_l <- mean(lambdas) / var(lambdas)
+alpha_l <- mean(lambdas) * beta_l
+beta_l 
+alpha_l 
+nd <- seq(0.001, 1, by = 0.01)
+plot(nd, dgamma(nd, shape = alpha_l, rate = beta_l))
+hist(lambdas, breaks = 50)
+
+mu_mu <- mean(means)
+mu_mu
+sigma2_mu <- var(means/ lambdas)
+sigma2_mu
+
+var(dt$value[which(dt$view == view)])
+```
+
+```{r}
+for (view in unique(dt$view)){
+  print(mean(dt$value[which(dt$view == view)]))
+  print(var(dt$value[which(dt$view == view)]))
+}
+```
+
+
