@@ -66,16 +66,28 @@ microbiome <- microbiome %>%
 factor(metadata$sample, levels = metadata$sample) == microbiome$sample
 ```
 
+### get microbiome info
+```{r}
+microbiome_info <- unique(dt[, c("feature", "view")])
+```
+
+### sort column by view
+```{r}
+taxa <- c()
+for (view in c("Bacteria", "Fungi", "Viruses")){
+  taxa <- c(taxa, microbiome_info$feature[microbiome_info$view == view])
+}
+  
+```
+
+
 ### joint data
 ```{r}
 joint_data <- merge(microbiome, metadata[,c("sample", "Category")], by = "sample") %>%
    arrange(sample)
 ```
 
-### get microbiome info
-```{r}
-microbiome_info <- unique(dt[, c("feature", "view")])
-```
+
 
 
 ### save all results
