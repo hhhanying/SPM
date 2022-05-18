@@ -5,8 +5,12 @@ T_generator <- function(k0, k1, nlabel){
   ntopic <- K
   Ts <- array(rep(0, dg * ntopic * nlabel), dim = c(nlabel, ntopic, dg))
   for (i in 1:nlabel){
-    for (j in 1:k0) Ts[i, (i - 1) * k0 + j, j] = 1
-    for (j in 1:k1) Ts[i, nlabel* k0 + j, k0 + j] = 1
+    if(k0 > 0){
+      for (j in 1:k0) Ts[i, (i - 1) * k0 + j, j] = 1
+    }
+    if(k1 > 0){
+      for (j in 1:k1) Ts[i, nlabel* k0 + j, k0 + j] = 1
+    }
   }
   
   Ts
