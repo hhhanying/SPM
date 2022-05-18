@@ -1,6 +1,9 @@
 ---
 title: "simulation"
 output: html_document
+params:
+  confi_file: "configurations.csv"
+  confi_index: 1
 ---
 
 ```{r setup, include=FALSE}
@@ -17,48 +20,138 @@ knitr::opts_chunk$set(echo = TRUE)
 #   seed
 # w?
 
+confi_file <- params$confi_file
+confi_index <- params$confi_index
+confi <- read.csv(confi_file)
 ```
 ```{r}
 library(tidyverse)
+source("R/shared.R")
+source("R/Normal.R")
+```
+```{r}
+# read parameters from configuration file
+b <- confi$b[confi_index]
+
+mu_Mu <- confi$mu_Mu[confi_index]
+sigma2_Mu <- confi$sigma2_Mu[confi_index]
+alpha_Lambda <- confi$alpha_Lambda[confi_index]
+beta_Lambda <- confi$beta_Lambda[confi_index]
+
+d <- confi$d[confi_index]
+k0 <- confi$k0[confi_index]
+k1 <- confi$k1[confi_index]
+
+
+nlabel <- confi$nlabel[confi_index]
+model <- confi$model[confi_index]
+weight_shared <- confi$weight_shared[confi_index]
+balanced <- confi$balanced[confi_index]
+seed <- confi$seed[confi_index]
+ # <- confi$[confi_index]
+ # <- confi$[confi_index]
+
+image_name <- paste0(model, confi_index, '.Rdata')
+
+ntrace <- 2000
+nchain <- 3
+nskip <- 2
+
+nsample <- 1000
+
+Ntrain <- 400
+Ntest <- 100
 ```
 
 ```{r}
+# generate parameter
 dg <- k0 + k1
 K <- nlabel * k0 + k1
 ntopic <- K
 
 Ts <- T_generator(k0, k1, nlabel)
-
-a <- rexp(n = 1, rate = b)
-rho <- gtools::rdirichlet(n = 1, alpha = alpha)
-
-Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
-  matrix(nrow = K)
-Mu <- matrix(NA, nrow = K, ncol = d)
-for (i in 1:K){
-  for (j in 1:d){
-    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(sigma2_Mu / Lambda[i, j]))
-  }
-}
-Tau <- Mu * Lambda
 ```
 
 
 ```{r}
-# simulate data
-training <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntrain, NULL, seed)
-testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, NULL, seed)
+# simulate data part
+# topic: alpha_lambda, beta_lambda, sigma2_mu (1), mu_Mu
+# corpus: b, weight_shared(0.5, 0.2), k0, k1, nlabel,
+# seed
+# d
 
-# fit the model
-estimate <- SPM_training_Normal(training[["X"]], training[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
+set.seed(seed)
 
-# predict the labels
-prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed) 
+# sample parameters
 
-accuracy <- sum(prediction[["labels"]] == testing[["Y"]])
+a <- rexp(n = 1, rate = b)
 
-# save image
+rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))
+
+Lambda <- rgamma(n = ntopic * d, shape = alpha_Lambda, rate = beta_Lambda) %>%
+  matrix(nrow = K)
+
+Mu <- matrix(NA, nrow = K, ncol = d)
+for (i in 1:K){
+  for (j in 1:d){
+    Mu[i, j] <- rnorm(1, mu_Mu, sqrt(1 / Lambda[i, j])) # different sigma2_Mu share same seed
+  }
+}
+
+rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+Mu <- Mu * sqrt(sigma2_Mu)
+Tau <- Mu * Lambda
+
+w = NULL
+if (balanced == "unbalanced"){
+  w = c(1, 1, 4, 4, 4)
+}
 ```
+
+```{r}
+# simulate data
+training <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntrain, w, seed)
+testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, w, seed)
+
+# split for CV
+# CV <- CV_split(Ntrain, no_fold, nfold, seed)
+# training_index <- CV$training_index
+# validation_index <- CV$validation_index
+```
+
+```{r}
+print(model)
+if (model == "SPM"){
+  # fit the model
+  estimate <- SPM_training_Normal(training[["X"]], training[["Y"]], Ts, b, rep(1, k0 + k1), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip) # uninformatve prior
+  # predict the labels
+  prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed) 
+  save.image(image_name)
+  
+  accuracy <- sum(prediction[["labels"]] == testing[["Y"]]) / Ntest
+  print(accuracy)
+  
+  # estimate memberships
+  membership <- SPM_membership_Normal(testing[["X"]], prediction[["labels"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, ntrace, nchain, nskip)
+  save.image(image_name)
+} else{
+  # fit the model
+  estimate <- BPM_training_Normal(training[["X"]], b, rep(1, K), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic_fit, ntrace, nchain, nskip)
+  save.image(image_name)
+  # estimate memberships for test set
+  U <- BPM_membership_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], ntrace, nchain, nskip)
+  save.image(image_name)
+  
+  library(e1071)
+  f1 <- svm(factor(training[["Y"]]) ~ estimate[["U"]])
+  prediction <- predict(f1, U)
+  accuracy <- sum(as.numeric(prediction) == testing[["Y"]]) / Ntest
+  print(accuracy)
+  save.image(image_name)
+}
+```
+
 
 
 
