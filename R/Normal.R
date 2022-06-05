@@ -37,7 +37,7 @@ document_generator_Normal <- function(a, rho, Ts, Lambda, Tau, N, w = NULL, seed
 #' Fit a SPM model on the training set given the hyperparameters.
 #' @return A list containing all estimated parameters.
 #' @export
-SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip){
+SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1){
   SPM_Normal_stancode <-"
   data {
     int<lower=0> dg;  // dim(membership)
@@ -135,10 +135,16 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
   )
   
   # sampling
-  fit_train <-rstan::stan(model_code = SPM_Normal_stancode,
-                          data = dat_fit,
-                          chains = nchain,
-                          iter = ntrace)
+  if(VI){
+    model <- rstan::stan_model(model_code = SPM_Normal_stancode)
+    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_train <-rstan::stan(model_code = SPM_Normal_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)
+  }
   
   trace <- as.matrix(fit_train)
   
@@ -221,7 +227,7 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
 #' Given the SPM model, estimate the membership for new data points.
 #' @return A matrix of the estimated memberships.
 #' @export
-SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip){
+SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1){
   SPM_Normal_membership_stancode <-"
   data {
       int<lower=0> dg;  // dim(membership)
@@ -293,10 +299,17 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, 
   )
   
   # sampling
-  fit_estimate <-rstan::stan(model_code = SPM_Normal_membership_stancode,
-                             data = dat_fit,
-                             chains = nchain,
-                             iter = ntrace)
+  if(VI){
+    model <- rstan::stan_model(model_code = SPM_Normal_membership_stancode)
+    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_train <-rstan::stan(model_code = SPM_Normal_membership_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)
+  }
+
   trace <- as.matrix(fit_estimate)
   
   # save results
@@ -319,7 +332,7 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, 
 #' Train a BPM model for normal distribution.
 #' @return A list containing all estimated parameters.
 #' @export
-BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip){
+BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1){
   BPM_Normal_stancode <-"
   data {
     int<lower=0> N;  // size of training set
@@ -402,10 +415,17 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   )
   
   # sampling
-  fit_train <-rstan::stan(model_code = BPM_Normal_stancode,
-                          data = dat_fit,
-                          chains = nchain,
-                          iter = ntrace)
+  if(VI){
+    model <- rstan::stan_model(model_code = BPM_Normal_stancode)
+    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_train <-rstan::stan(model_code = BPM_Normal_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)
+  }
+
   trace <- as.matrix(fit_train)
   
   # save results
@@ -448,7 +468,7 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
 #' Given the BPM model, estimate the membership for new data points.
 #' @return A matrix of the estimated memberships.
 #' @export
-BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip){
+BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1){
   BPM_Normal_membership_stancode <-"
   data {
       int<lower=0> N;  // size of training set
@@ -502,10 +522,17 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip){
   )
   
   # sampling
-  fit_estimate <-rstan::stan(model_code = BPM_Normal_membership_stancode,
-                             data = dat_fit,
-                             chains = nchain,
-                             iter = ntrace)
+  if(VI){
+    model <- rstan::stan_model(model_code = BPM_Normal_membership_stancode)
+    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_train <-rstan::stan(model_code = BPM_Normal_membership_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)
+  }
+
   trace <- as.matrix(fit_estimate)
   
   # save results

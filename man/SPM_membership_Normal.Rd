@@ -4,7 +4,20 @@
 \alias{SPM_membership_Normal}
 \title{Given the SPM model, estimate the membership for new data points.}
 \usage{
-SPM_membership_Normal(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip)
+SPM_membership_Normal(
+  X,
+  Y,
+  Lambda,
+  Mu,
+  a,
+  rho,
+  Ts,
+  VI = FALSE,
+  ntrace = 1000,
+  nchain = 2,
+  nskip = 2,
+  seed = 1
+)
 }
 \value{
 A matrix of the estimated memberships.

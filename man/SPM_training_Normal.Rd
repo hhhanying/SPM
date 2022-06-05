@@ -14,9 +14,11 @@ SPM_training_Normal(
   sigma2_Mu,
   alpha_Lambda,
   beta_Lambda,
-  ntrace,
-  nchain,
-  nskip
+  VI = FALSE,
+  ntrace = 1000,
+  nchain = 2,
+  nskip = 2,
+  seed = 1
 )
 }
 \value{

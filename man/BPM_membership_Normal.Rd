@@ -4,7 +4,18 @@
 \alias{BPM_membership_Normal}
 \title{Given the BPM model, estimate the membership for new data points.}
 \usage{
-BPM_membership_Normal(X, Lambda, Mu, a, rho, ntrace, nchain, nskip)
+BPM_membership_Normal(
+  X,
+  Lambda,
+  Mu,
+  a,
+  rho,
+  VI = FALSE,
+  ntrace = 1000,
+  nchain = 2,
+  nskip = 2,
+  seed = 1
+)
 }
 \value{
 A matrix of the estimated memberships.

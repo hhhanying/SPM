@@ -13,9 +13,11 @@ BPM_training_Normal(
   alpha_Lambda,
   beta_Lambda,
   ntopic,
-  ntrace,
-  nchain,
-  nskip
+  VI = FALSE,
+  ntrace = 1000,
+  nchain = 2,
+  nskip = 2,
+  seed = 1
 )
 }
 \value{
