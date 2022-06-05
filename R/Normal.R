@@ -237,7 +237,7 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, VI = FALSE, ntra
       int<lower=0> d; //dim of data
       
       real<lower=0> a;
-      simplex[dg] rho;
+      vector[dg] rho;
   
       matrix[N, d] X;
       int<lower=1> Y[N];         // label, start from 1 
@@ -279,6 +279,10 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, VI = FALSE, ntra
   d <- dim(X)[2]
   
   Tau <- Mu * Lambda
+  
+  if(is.matrix(rho)){
+    rho <- as.vector(rho)
+  }
   
   dat_fit <- list(
     dg = dg,

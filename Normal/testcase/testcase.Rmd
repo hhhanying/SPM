@@ -59,7 +59,7 @@ for (i in 1:K){
 Tau <- Mu * Lambda
 
 ntrace <- 2000
-nchain <- 2
+nchain <- 1
 nskip <- 2
 nsample <- 1000
 ```
@@ -73,418 +73,68 @@ dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
 ### SPM
 
 #### training
-
 ```{r}
-res <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
-```
-
-#### test vi
-
-```{r}
-SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2){
-  SPM_Normal_stancode <-"
-  data {
-    int<lower=0> dg;  // dim(membership)
-    int<lower=0> N;  // size of training set
-    int<lower=0> nlabel;
-    int<lower=0> ntopic;
-    int<lower=0> d; //dim of data
-    
-    matrix[N, d] X;
-    int<lower=1> Y[N];         // label, start from 1 
-    
-    matrix[ntopic, dg] T[nlabel];
-    
-    real<lower=0> b;
-    vector<lower=0>[dg] alpha;
-    matrix[ntopic, d] mu_Mu;
-    matrix[ntopic, d] sigma2_Mu;
-    matrix[ntopic, d] alpha_Lambda;
-    matrix[ntopic, d] beta_Lambda;
-    
-  }
-  parameters {
-    real<lower=0> a;
-    simplex[dg] rho;
-    
-    simplex[dg] G[N];
-    
-    matrix[ntopic, d] Mu;
-    matrix<lower=0>[ntopic, d] Lambda;
-
-  }
-  model{
-    matrix[ntopic, d] Tau;
-    vector[ntopic] U[N];
-    row_vector[d] lambda_X[N];
-    row_vector[d] tau_X[N];
-    
-    a ~ exponential(b);
-    rho ~ dirichlet(alpha);
-
-    // topics
-    for (i in 1:ntopic){
-      Lambda[i] ~ gamma(alpha_Lambda[i], beta_Lambda[i]);
-      Mu[i] ~ normal(mu_Mu[i], sqrt(sigma2_Mu[i] ./ Lambda[i]));
-      Tau[i] = Mu[i] .* Lambda[i];
-    }
-    
-    for(i in 1:N){
-      G[i] ~ dirichlet(a * rho);
-      U[i] = T[Y[i]] * G[i];
-      lambda_X[i] = U[i]' * Lambda;
-      tau_X[i] = U[i]' * Tau;
-      X[i] ~ normal(tau_X[i] ./ lambda_X[i], sqrt(1 ./ lambda_X[i]));
-    }
-
-  }
-  "
-
-  # calculate needed parameters (avoid too many inputs)
-  N <- length(Y)
-  nlabel <- dim(Ts)[1]
-  dg <- dim(Ts)[3]
-  ntopic <- dim(Ts)[2]
-  d <- dim(X)[2]
-  
-  # we assume all hyperparameters for topics are matrices, if they are not, we will duplicate it to make a matrix
-  # mu_Mu = SPM::trans_to_matrix(mu_Mu, ntopic, d)
-  # sigma2_Mu = SPM::trans_to_matrix(sigma2_Mu, ntopic, d)
-  # alpha_Lambda = SPM::trans_to_matrix(alpha_Lambda, ntopic, d)
-  # beta_Lambda = SPM::trans_to_matrix(beta_Lambda, ntopic, d)
-  mu_Mu = trans_to_matrix(mu_Mu, ntopic, d)
-  sigma2_Mu = trans_to_matrix(sigma2_Mu, ntopic, d)
-  alpha_Lambda = trans_to_matrix(alpha_Lambda, ntopic, d)
-  beta_Lambda = trans_to_matrix(beta_Lambda, ntopic, d)
-  
-  # the data to fit
-  dat_fit <- list(
-    dg = dg,
-    N = N,
-    nlabel = nlabel,
-    ntopic = ntopic,
-    d = d,
-    
-    X = X,
-    Y = Y,
-    
-    T = Ts,
-    
-    b = b, 
-    alpha = alpha,
-    mu_Mu = mu_Mu,
-    sigma2_Mu = sigma2_Mu,
-    alpha_Lambda = alpha_Lambda,
-    beta_Lambda = beta_Lambda
-  )
-  
-  # sampling
-  if(VI){
-    model <- rstan::stan_model(model_code = SPM_Normal_stancode)
-    fit_train <-rstan::vb(model, data = dat_fit)
-  }else{
-    fit_train <-rstan::stan(model_code = SPM_Normal_stancode,
-                            data = dat_fit,
-                            chains = nchain,
-                            iter = ntrace)
-  }
-  
-  trace <- as.matrix(fit_train)
-  
-  # save results
-  nsample <- dim(trace)[1]
-  nsave <- nsample %/% nskip
-  index_save <- (1:nsave) * nskip
-  trace <- trace[index_save,]
-  
-  
-  res <- list()
-  
-  paras <- c("G", "Lambda", "Mu")
-  d1s <- c(N, K, K)
-  d2s <- c(dg, d, d)
-  for (i in 1:3){
-    para <- paras[i]
-    d1 <- d1s[i]
-    d2 <- d2s[i]
-    tem <- matrix(NA, nrow = d1, ncol = d2)
-    for (i1 in 1:d1){
-      for(i2 in 1:d2){
-        varname <- sprintf("%s[%s,%s]", para, i1, i2)
-        tem[i1, i2] <- mean(trace[, varname])
-      }
-    } 
-    res[[para]] <- tem
-  }
-  
-  res[["a"]] <- mean(trace[, "a"])
-  
-  tem <- rep(0, dg)
-  for (i in 1:dg){
-    varname <- sprintf("rho[%s]", i)
-    tem[i] <- mean(trace[, varname])
-  }
-  res[["rho"]] <- tem
-  
-  res
-}
-res <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, TRUE)
-```
-
-```{r}
-library(rstan)
-model <- stan_model(model_code = "
-  data {
-    int<lower=0> dg;  // dim(membership)
-    int<lower=0> N;  // size of training set
-    int<lower=0> nlabel;
-    int<lower=0> ntopic;
-    int<lower=0> d; //dim of data
-    
-    matrix[N, d] X;
-    int<lower=1> Y[N];         // label, start from 1 
-    
-    matrix[ntopic, dg] T[nlabel];
-    
-    real<lower=0> b;
-    vector<lower=0>[dg] alpha;
-    matrix[ntopic, d] mu_Mu;
-    matrix[ntopic, d] sigma2_Mu;
-    matrix[ntopic, d] alpha_Lambda;
-    matrix[ntopic, d] beta_Lambda;
-    
-  }
-  parameters {
-    real<lower=0> a;
-    simplex[dg] rho;
-    
-    simplex[dg] G[N];
-    
-    matrix[ntopic, d] Mu;
-    matrix<lower=0>[ntopic, d] Lambda;
-
-  }
-  model{
-    matrix[ntopic, d] Tau;
-    vector[ntopic] U[N];
-    row_vector[d] lambda_X[N];
-    row_vector[d] tau_X[N];
-    
-    a ~ exponential(b);
-    rho ~ dirichlet(alpha);
-
-    // topics
-    for (i in 1:ntopic){
-      Lambda[i] ~ gamma(alpha_Lambda[i], beta_Lambda[i]);
-      Mu[i] ~ normal(mu_Mu[i], sqrt(sigma2_Mu[i] ./ Lambda[i]));
-      Tau[i] = Mu[i] .* Lambda[i];
-    }
-    
-    for(i in 1:N){
-      G[i] ~ dirichlet(a * rho);
-      U[i] = T[Y[i]] * G[i];
-      lambda_X[i] = U[i]' * Lambda;
-      tau_X[i] = U[i]' * Tau;
-      X[i] ~ normal(tau_X[i] ./ lambda_X[i], sqrt(1 ./ lambda_X[i]));
-    }
-
-  }
-  ")
-dat_fit <- list(
-    dg = dg,
-    N = N,
-    nlabel = nlabel,
-    ntopic = ntopic,
-    d = d,
-    
-    X = dat$X,
-    Y = dat$Y,
-    
-    T = Ts,
-    
-    b = b, 
-    alpha = alpha,
-    mu_Mu = trans_to_matrix(mu_Mu, ntopic, d),
-    sigma2_Mu = trans_to_matrix(sigma2_Mu, ntopic, d),
-    alpha_Lambda = trans_to_matrix(alpha_Lambda, ntopic, d),
-    beta_Lambda = trans_to_matrix(beta_Lambda, ntopic, d)
-  )
-
-res <- vb(model, data = dat_fit)
+# NUTS sampler
+start_time <- Sys.time()
+res_nuts <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, FALSE, ntrace, nchain, nskip, seed)
+end_time <- Sys.time()
+end_time - start_time
+print(end_time)
 ```
 ```{r}
-res <- SPM_training_Norma_vsl(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
-prediction <- SPM_predicting_Normal(dat[["X"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts, nsample, seed, w = NULL) # with results
-sum(prediction[["labels"]] == dat[["Y"]])
+# Variational inference
+start_time <- Sys.time()
+res_VI <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, TRUE, nskip = nskip, seed = seed)
+end_time <- Sys.time()
+end_time - start_time
 ```
-
-
-```{r}
-SPM_training_Norma_vsl <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip){
-  SPM_Normal_stancode <-"
-  data {
-    int<lower=0> dg;  // dim(membership)
-    int<lower=0> N;  // size of training set
-    int<lower=0> nlabel;
-    int<lower=0> ntopic;
-    int<lower=0> d; //dim of data
-    
-    matrix[N, d] X;
-    int<lower=1> Y[N];         // label, start from 1 
-    
-    matrix[ntopic, dg] T[nlabel];
-    
-    real<lower=0> b;
-    vector<lower=0>[dg] alpha;
-    matrix[ntopic, d] mu_Mu;
-    matrix[ntopic, d] sigma2_Mu;
-    matrix[ntopic, d] alpha_Lambda;
-    matrix[ntopic, d] beta_Lambda;
-    
-  }
-  parameters {
-    real<lower=0> a;
-    simplex[dg] rho;
-    
-    simplex[dg] G[N];
-    
-    matrix[ntopic, d] Mu;
-    matrix<lower=0>[ntopic, d] Lambda;
-
-  }
-  model{
-    matrix[ntopic, d] Tau;
-    vector[ntopic] U[N];
-    row_vector[d] lambda_X[N];
-    row_vector[d] tau_X[N];
-    
-    a ~ exponential(b);
-    rho ~ dirichlet(alpha);
-
-    // topics
-    for (i in 1:ntopic){
-      Lambda[i] ~ gamma(alpha_Lambda[i], beta_Lambda[i]);
-      Mu[i] ~ normal(mu_Mu[i], sqrt(sigma2_Mu[i] ./ Lambda[i]));
-      Tau[i] = Mu[i] .* Lambda[i];
-    }
-    
-    for(i in 1:N){
-      G[i] ~ dirichlet(a * rho);
-      U[i] = T[Y[i]] * G[i];
-      lambda_X[i] = U[i]' * Lambda;
-      tau_X[i] = U[i]' * Tau;
-      X[i] ~ normal(tau_X[i] ./ lambda_X[i], sqrt(1 ./ lambda_X[i]));
-    }
-
-  }
-  "
-
-  # calculate needed parameters (avoid too many inputs)
-  N <- length(Y)
-  nlabel <- dim(Ts)[1]
-  dg <- dim(Ts)[3]
-  ntopic <- dim(Ts)[2]
-  d <- dim(X)[2]
-  
-  # we assume all hyperparameters for topics are matrices, if they are not, we will duplicate it to make a matrix
-  # mu_Mu = SPM::trans_to_matrix(mu_Mu, ntopic, d)
-  # sigma2_Mu = SPM::trans_to_matrix(sigma2_Mu, ntopic, d)
-  # alpha_Lambda = SPM::trans_to_matrix(alpha_Lambda, ntopic, d)
-  # beta_Lambda = SPM::trans_to_matrix(beta_Lambda, ntopic, d)
-  mu_Mu = trans_to_matrix(mu_Mu, ntopic, d)
-  sigma2_Mu = trans_to_matrix(sigma2_Mu, ntopic, d)
-  alpha_Lambda = trans_to_matrix(alpha_Lambda, ntopic, d)
-  beta_Lambda = trans_to_matrix(beta_Lambda, ntopic, d)
-  
-  # the data to fit
-  dat_fit <- list(
-    dg = dg,
-    N = N,
-    nlabel = nlabel,
-    ntopic = ntopic,
-    d = d,
-    
-    X = X,
-    Y = Y,
-    
-    T = Ts,
-    
-    b = b, 
-    alpha = alpha,
-    mu_Mu = mu_Mu,
-    sigma2_Mu = sigma2_Mu,
-    alpha_Lambda = alpha_Lambda,
-    beta_Lambda = beta_Lambda
-  )
-  
-  # sampling
-  fit_train <-rstan::vb(model, data = dat_fit)
-  
-  trace <- as.matrix(fit_train)
-  
-  # save results
-  nsample <- dim(trace)[1]
-  nsave <- nsample %/% nskip
-  index_save <- (1:nsave) * nskip
-  trace <- trace[index_save,]
-  
-  
-  res <- list()
-  
-  paras <- c("G", "Lambda", "Mu")
-  d1s <- c(N, K, K)
-  d2s <- c(dg, d, d)
-  for (i in 1:3){
-    para <- paras[i]
-    d1 <- d1s[i]
-    d2 <- d2s[i]
-    tem <- matrix(NA, nrow = d1, ncol = d2)
-    for (i1 in 1:d1){
-      for(i2 in 1:d2){
-        varname <- sprintf("%s[%s,%s]", para, i1, i2)
-        tem[i1, i2] <- mean(trace[, varname])
-      }
-    } 
-    res[[para]] <- tem
-  }
-  
-  res[["a"]] <- mean(trace[, "a"])
-  
-  tem <- rep(0, dg)
-  for (i in 1:dg){
-    varname <- sprintf("rho[%s]", i)
-    tem[i] <- mean(trace[, varname])
-  }
-  res[["rho"]] <- tem
-  
-  res
-}
-
-```
-
 
 #### predicting
 
 ```{r}
-prediction <- SPM_predicting_Normal(dat[["X"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts, nsample, seed, w = NULL) # with results
-sum(prediction[["labels"]] == dat[["Y"]])
-
-prediction2 <- SPM_predicting_Normal(dat[["X"]], Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL) # with true parameters
-sum(prediction2[["labels"]] == dat[["Y"]])
+# use results from sampling
+prediction_nuts <- SPM_predicting_Normal(dat[["X"]], res_nuts[["Lambda"]], res_nuts[["Mu"]], res_nuts[["a"]], res_nuts[["rho"]], Ts, nsample, seed, w = NULL) 
+sum(prediction_nuts[["labels"]] == dat[["Y"]])
+# use results from VI
+prediction_VI <- SPM_predicting_Normal(dat[["X"]], res_VI[["Lambda"]], res_VI[["Mu"]], res_VI[["a"]], res_VI[["rho"]], Ts, nsample, seed, w = NULL)
+sum(prediction_VI[["labels"]] == dat[["Y"]])
+# use true parameters
+prediction_true <- SPM_predicting_Normal(dat[["X"]], Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL)
+sum(prediction_true[["labels"]] == dat[["Y"]])
 ```
 
 #### estimating memberships
 
 ```{r}
-m1 <- SPM_membership_Normal(dat[["X"]], prediction[["labels"]], res[["Lambda"]], res[["Mu"]], res[["a"]], res[["rho"]], Ts,  2000, 2, nskip, seed)
-#m2 <- SPM_membership_Normal(dat[["X"]], dat[["Y"]], Lambda, Mu, a, as.vector(rho), Ts, 2000, 1, nskip, seed)
+start_time <- Sys.time()
+m_nuts <- SPM_membership_Normal(dat[["X"]], prediction_nuts[["labels"]], res_nuts[["Lambda"]], res_nuts[["Mu"]], res_nuts[["a"]], res_nuts[["rho"]], Ts,  FALSE, ntrace, nchain, nskip, seed)
+end_time <- Sys.time()
+end_time - start_time
+
+
+start_time <- Sys.time()
+m_VI <- SPM_membership_Normal(dat[["X"]], prediction_VI[["labels"]], res_VI[["Lambda"]], res_VI[["Mu"]], res_VI[["a"]], res_VI[["rho"]], Ts,  TRUE, nskip = nskip, seed = seed)
+end_time <- Sys.time()
+end_time - start_time
+
+start_time <- Sys.time()
+m_true <- SPM_membership_Normal(dat[["X"]], prediction_true[["labels"]], Lambda, Mu, a, rho, Ts, TRUE, nskip = nskip, seed = seed)
+end_time <- Sys.time()
+end_time - start_time
+
 ```
 
 ```{r}
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
-corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts))))
-# corrplot::corrplot(cor(t(U(m2, prediction[['labels']], Ts))))
+corrplot::corrplot(cor(t(U(m_nuts, prediction[['labels']], Ts))))
+
+corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
+corrplot::corrplot(cor(t(dat[["X"]])))
+
+corrplot::corrplot(cor(t(U(m_VI, prediction_VI[['labels']], Ts))))
+
+corrplot::corrplot(cor(t(U(m_true, prediction_true[['labels']], Ts))))
 ```
 
 ```{r}
@@ -494,23 +144,36 @@ save.image("./testcase.Rdata")
 
 ### BPM
 ```{r}
-res_BPM <- BPM_training_Normal(dat[['X']], b, rep(1, ntopic), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip)
+start_time <- Sys.time()
+res_BPM_nuts <- BPM_training_Normal(dat[['X']], b, rep(1, ntopic), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, FALSE, ntrace, nchain, nskip, seed)
+end_time <- Sys.time()
+end_time - start_time
+
+start_time <- Sys.time()
+res_BPM_VI <- BPM_training_Normal(dat[['X']], b, rep(1, ntopic), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, TRUE, nskip = nskip, seed = seed)
+end_time <- Sys.time()
+end_time - start_time
 ```
 
 ```{r}
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
 corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts)))) # spm
-corrplot::corrplot(cor(t(res_BPM[["U"]]))) # BPM
+corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
+corrplot::corrplot(cor(t(res_BPM_VI[["U"]]))) # BPM
 ```
 
 
 ```{r}
 ### test SVM
 library(e1071)
-f1 <- svm(factor(dat[["Y"]]) ~ res_BPM[["U"]])
-l1 <- predict(f1, res_BPM[["U"]])
+f1 <- svm(factor(dat[["Y"]]) ~ res_BPM_nuts[["U"]])
+l1 <- predict(f1, res_BPM_nuts[["U"]])
 sum(l1 == factor(dat[["Y"]]))
+
+f2 <- svm(factor(dat[["Y"]]) ~ res_BPM_VI[["U"]])
+l2 <- predict(f2, res_BPM_VI[["U"]])
+sum(l2 == factor(dat[["Y"]]))
 ```
 
 ```{r}
