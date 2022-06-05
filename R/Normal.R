@@ -301,9 +301,9 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, VI = FALSE, ntra
   # sampling
   if(VI){
     model <- rstan::stan_model(model_code = SPM_Normal_membership_stancode)
-    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
   }else{
-    fit_train <-rstan::stan(model_code = SPM_Normal_membership_stancode,
+    fit_estimate <-rstan::stan(model_code = SPM_Normal_membership_stancode,
                             data = dat_fit,
                             chains = nchain,
                             iter = ntrace,
@@ -524,9 +524,9 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
   # sampling
   if(VI){
     model <- rstan::stan_model(model_code = BPM_Normal_membership_stancode)
-    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
   }else{
-    fit_train <-rstan::stan(model_code = BPM_Normal_membership_stancode,
+    fit_estimate <-rstan::stan(model_code = BPM_Normal_membership_stancode,
                             data = dat_fit,
                             chains = nchain,
                             iter = ntrace,
