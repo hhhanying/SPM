@@ -1,4 +1,5 @@
-# Used to generate array of transformation matrix T
+#' Given the model setting, generate the transformation matrices.
+#' @export
 T_generator <- function(k0, k1, nlabel){
   dg <- k0 + k1
   K <- nlabel * k0 + k1
@@ -16,8 +17,8 @@ T_generator <- function(k0, k1, nlabel){
   Ts
 }
 
-# To accommodate more complicated cases, we allow hyperparameters for topic parameters to be different among dimensions / topics
-# When the hyperparameter is a constant (same for all) or a vector (different only among dimensions / topics), this function is used to transform it to a matrix to adapt to the stan sampling
+#' Helpful function to summarize the sampling results.
+#' @export
 trans_to_matrix <- function(x, d1, d2, byfeature = TRUE){
   if (is.matrix(x)) return(x)
   if (length(x) == 1) return(matrix(rep(x, d1 * d2), nrow = d1))
@@ -25,7 +26,8 @@ trans_to_matrix <- function(x, d1, d2, byfeature = TRUE){
   return(matrix(rep(x, d2), nrow = d1, byrow = FALSE))
 }
 
-# Generate transformed memberships
+#' Generate transformed memberships
+#' @export
 U <- function(G, Y, Ts){
   N <- length(Y)
   K <- dim(Ts)[2]

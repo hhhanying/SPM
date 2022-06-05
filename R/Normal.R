@@ -1,3 +1,9 @@
+#' Simulate data from given parameters.
+#'
+#' @param a: dispersion parameter for membership
+#' @param rho: weight parameter for membership
+#' @return A list res containing: 1) X: the document; 2) Y: the labels; 3) G: the untransformed memberships and 4) U: the transformed memberships. 
+#' @export
 document_generator_Normal <- function(a, rho, Ts, Lambda, Tau, N, w = NULL, seed = NULL){
   if (!is.null(seed)){
     set.seed(seed)
@@ -28,6 +34,9 @@ document_generator_Normal <- function(a, rho, Ts, Lambda, Tau, N, w = NULL, seed
   list(X = X, Y = Y, G = G, U = U)  
 }
 
+#' Fit a SPM model on the training set given the hyperparameters.
+#' @return A list containing all estimated parameters.
+#' @export
 SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip){
   SPM_Normal_stancode <-"
   data {
@@ -171,6 +180,9 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
   res
 }
 
+#' Given the SPM model, predict labels for a new document.
+#' @return A list containing the posterior distribution of labels and the estimated labels.
+#' @export
 SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL){
   nlabel <- dim(Ts)[1]
   N <- dim(X)[1]
@@ -206,6 +218,9 @@ SPM_predicting_Normal <- function(X, Lambda, Mu, a, rho, Ts, nsample, seed, w = 
   list(posterior = probs, labels = Y)
 }
 
+#' Given the SPM model, estimate the membership for new data points.
+#' @return A matrix of the estimated memberships.
+#' @export
 SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, nskip){
   SPM_Normal_membership_stancode <-"
   data {
@@ -301,6 +316,9 @@ SPM_membership_Normal <- function(X, Y, Lambda, Mu, a, rho, Ts, ntrace, nchain, 
   G
 }
 
+#' Train a BPM model for normal distribution.
+#' @return A list containing all estimated parameters.
+#' @export
 BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip){
   BPM_Normal_stancode <-"
   data {
@@ -427,6 +445,9 @@ BPM_training_Normal <- function(X, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, bet
   res
 }
 
+#' Given the BPM model, estimate the membership for new data points.
+#' @return A matrix of the estimated memberships.
+#' @export
 BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip){
   BPM_Normal_membership_stancode <-"
   data {
@@ -504,6 +525,9 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, ntrace, nchain, nskip){
   U
 }
 
+#' Calculate the generated distribution given the membership and the topics.
+#' @return A list of the parameters of the distributions of data given its memberships.
+#' @export
 get_parameters_Normal <- function(X, Y, G, Ts, Lambda, Mu){
   Tau <- Mu * Lambda
   U <- matrix(NA, nrow = N, ncol = K)
