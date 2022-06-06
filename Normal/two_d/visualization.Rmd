@@ -1,0 +1,101 @@
+---
+title: "visualization"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document is used to test the setting of SPM model in 2d cases. 
+
+```{r}
+library(tidyverse)
+library(SPM)
+```
+
+```{r}
+# fixed
+k0 <- 1
+k1 <- 1
+nlabel <- 2
+
+d <- 2
+
+seed <- 1
+
+rho <- c(0.5, 0.5)
+
+N = 100
+
+# parameter
+r <- 1
+theta <- pi / 2
+
+a <- 1
+
+S <- matrix(
+  c(1, 1, 1, 1, 1, 1),
+  ncol = d,
+  byrow = TRUE
+)
+
+S <- S * 0.01
+
+# generated
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+Ts <- T_generator(k0, k1, nlabel)
+
+Mu <- matrix( 
+  c(1, 0, r * cos(theta), r * sin(theta), 0, 0),
+  ncol = d,
+  byrow = TRUE
+)
+
+Lambda <- 1 / S
+Tau <- Mu * Lambda
+
+# genarate data
+set.seed(seed)
+
+dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
+
+plot_dat_2d <- function(X, Y){
+  tem <- data.frame(X, factor(Y))
+  colnames(tem) <- c("X1", "X2", "Y")
+  p <- tem %>%
+    ggplot(aes(x = X1, y = X2, color = Y)) +
+    geom_point()
+  print(p)
+  p
+}
+p <- plot_dat_2d(dat$X, dat$Y)
+
+```
+
+```{r}
+
+
+N = 100
+
+
+
+
+
+ntrace <- 2000
+nchain <- 2
+nskip <- 2
+nsample <- 1000
+```
+
+
+```{r}
+document_generator_Normal(a, rho, Ts, Lambda, Tau, N, w = NULL, seed = NULL)
+  
+ 
+
+```
+
