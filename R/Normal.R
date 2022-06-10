@@ -558,6 +558,7 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
   d <- dim(X)[2]
   ntopic <- dim(Lambda)[1]
   Tau <- Mu * Lambda
+  K <- ntopic
   
   dat_fit <- list(
     N = N,
