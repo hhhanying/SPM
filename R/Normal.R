@@ -34,6 +34,49 @@ document_generator_Normal <- function(a, rho, Ts, Lambda, Tau, N, w = NULL, seed
   list(X = X, Y = Y, G = G, U = U)  
 }
 
+#' Given the estimated topics and memberships, simulate data
+#' @return X: the simulated data
+#' @export
+SPM_simulator_Normal <- function(Lambda = NULL, Tau = NULL, Mu = NULL, S = NULL, Ts = NULL, G = NULL, Y = NULL, U = NULL, seed = NULL){
+  # if random seed is provided
+  if (!is.null(seed)){
+    set.seed(seed)
+  }
+  # if membership is untransformed
+  if (is.null(U)){
+    K <- dim(Ts)[2]
+    N <- length(Y)
+    
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }
+    
+  } else{
+    N <- dim(U)[1]
+  }
+  # what form of parameters are given
+  if (is.null(Lambda)){
+    Lambda <- 1 / S
+  }
+  if (is.null(Tau)){
+    Tau <- Mu * Lambda
+  }
+  
+  d <- dim(Tau)[2]
+  
+  LambdaX <- U %*% Lambda
+  TauX <- U %*% Tau
+  SigmaX <- sqrt(1 / LambdaX) 
+  MuX <- TauX / LambdaX
+  
+  X <- matrix(NA, nrow = N, ncol = d)
+  for(i in 1:N){
+    X[i,] <- rnorm(n = d, mean = MuX[i,], sd = SigmaX[i,])
+  }
+  
+  X 
+}
 #' Fit a SPM model on the training set given the hyperparameters.
 #' @return A list containing all estimated parameters.
 #' @export
