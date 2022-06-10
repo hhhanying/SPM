@@ -145,6 +145,7 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lamb
   dg <- dim(Ts)[3]
   ntopic <- dim(Ts)[2]
   d <- dim(X)[2]
+  K <- nlabel
   
   # we assume all hyperparameters for topics are matrices, if they are not, we will duplicate it to make a matrix
   # mu_Mu = SPM::trans_to_matrix(mu_Mu, ntopic, d)
