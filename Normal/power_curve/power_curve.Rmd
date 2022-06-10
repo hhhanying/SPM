@@ -16,6 +16,49 @@ library(e1071)
 Let's stick to the idea of rotate one class-specific topic. The only things that should be changed are the topics.
 
 First, consider all lambdas are the same. Visualiza the dataset:
+```{r}
+SPM_simulator_Normal <- function(Lambda = NULL, Tau = NULL, Mu = NULL, S = NULL, Ts = NULL, G = NULL, Y = NULL, U = NULL, seed = NULL){
+  # if random seed is provided
+  if (!is.null(seed)){
+    set.seed(seed)
+  }
+  # if membership is untransformed
+  if (is.null(U)){
+    K <- dim(Ts)[2]
+    N <- length(Y)
+    
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }
+    
+  } else{
+    N <- dim(U)[1]
+  }
+  # what form of parameters are given
+  if (is.null(Lambda)){
+    Lambda <- 1 / S
+  }
+  if (is.null(Tau)){
+    Tau <- Mu * Lambda
+  }
+  
+  d <- dim(Tau)[2]
+  
+  LambdaX <- U %*% Lambda
+  TauX <- U %*% Tau
+  SigmaX <- sqrt(1 / LambdaX) 
+  MuX <- TauX / LambdaX
+
+  X <- matrix(NA, nrow = N, ncol = d)
+  for(i in 1:N){
+    X[i,] <- rnorm(n = d, mean = MuX[i,], sd = SigmaX[i,])
+  }
+  
+  X 
+}
+
+```
 
 ```{r}
 vis_rotate <- function(r, Ntheta, s, N){
@@ -28,7 +71,7 @@ vis_rotate <- function(r, Ntheta, s, N){
   a <- 10
 
   S <- matrix(
-    rep(1,2 * nlabel),
+    rep(1, 2 * (1 + nlabel)),
     ncol = d,
     byrow = TRUE
   )
@@ -42,7 +85,7 @@ vis_rotate <- function(r, Ntheta, s, N){
   
   thetas <- pi * seq(0, 1, length.out = Ntheta + 1) 
   Mu <- matrix( 
-    c(r * cos(thetas), r * sin(thetas)),
+    c(r * cos(thetas), 0, r * sin(thetas), 0),
     ncol = d,
     byrow = FALSE)
   
@@ -52,21 +95,26 @@ vis_rotate <- function(r, Ntheta, s, N){
   # genarate data
   set.seed(seed)
   
+  #G <- gtools::rdirichlet(n = N, alpha = a * rho)
+  
   dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
   
   plot_dat <- data.frame(dat$X, factor(dat$Y))
   names(plot_dat) <- c("X1", "X2", "Y")
   
   
-  p <- data.frame %>% ggplot(aes(x = X1, y = X2, color = Y)) +
+  p <- plot_dat %>% ggplot(aes(x = X1, y = X2, color = Y)) +
     geom_point()
   print(p)
   
   dat
   }
 
-vis_rotate(1, 12, 0.1, 100)
 
+dat <- vis_rotate(1, 12, 0.1, 1300)
+dat <- vis_rotate(1, 12, 0.01, 1300)
+dat <- vis_rotate(1, 12, 0.001, 1300)
+dat <- vis_rotate(1, 12, 0.0001, 1300)
 ```
 
 
