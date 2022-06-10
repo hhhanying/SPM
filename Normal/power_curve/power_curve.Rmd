@@ -7,13 +7,76 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This document is used to test the setting of SPM model in 2d cases. 
-
 ```{r}
 library(tidyverse)
 library(SPM)
 library(e1071)
 ```
+
+Let's stick to the idea of rotate one class-specific topic. The only things that should be changed are the topics.
+
+First, consider all lambdas are the same. Visualiza the dataset:
+
+```{r}
+vis_rotate <- function(r, Ntheta, s, N){
+  k0 <- 1
+  k1 <- 1
+  nlabel <- 13 # one fixed
+  d <- 2
+  seed <- 1
+  rho <- c(0.5, 0.5)
+  a <- 10
+
+  S <- matrix(
+    rep(1,2 * nlabel),
+    ncol = d,
+    byrow = TRUE
+  )
+  S <- S * s
+  
+  dg <- k0 + k1
+  K <- nlabel * k0 + k1
+  ntopic <- K
+  
+  Ts <- T_generator(k0, k1, nlabel)
+  
+  thetas <- pi * seq(0, 1, length.out = Ntheta + 1) 
+  Mu <- matrix( 
+    c(r * cos(thetas), r * sin(thetas)),
+    ncol = d,
+    byrow = FALSE)
+  
+  Lambda <- 1 / S
+  Tau <- Mu * Lambda
+  
+  # genarate data
+  set.seed(seed)
+  
+  dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
+  
+  plot_dat <- data.frame(dat$X, factor(dat$Y))
+  names(plot_dat) <- c("X1", "X2", "Y")
+  
+  
+  p <- data.frame %>% ggplot(aes(x = X1, y = X2, color = Y)) +
+    geom_point()
+  print(p)
+  
+  dat
+  }
+
+vis_rotate(1, 12, 0.1, 100)
+
+```
+
+
+
+
+
+
+This document is used to test the setting of SPM model in 2d cases. 
+
+
 ```{r}
 training_dat_generator <- function(r, theta, s){
   k0 <- 1
