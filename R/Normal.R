@@ -605,11 +605,13 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
 #' Calculate the generated distribution given the membership and the topics.
 #' @return A list of the parameters of the distributions of data given its memberships.
 #' @export
-get_parameters_Normal <- function(X, Y, G, Ts, Lambda, Mu){
+get_parameters_Normal <- function(X, Lambda, Mu, G = NULL, Ts = NULL, Y = NULL, U = NULL){
   Tau <- Mu * Lambda
-  U <- matrix(NA, nrow = N, ncol = K)
-  for (i in 1:N){
-    U[i,] <- Ts[Y[i], ,] %*% G[i,]
+  if (is.null(U)){
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }
   }
   
   LambdaX <- U %*% Lambda
