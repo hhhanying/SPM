@@ -607,6 +607,8 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
 #' @export
 get_parameters_Normal <- function(X, Lambda, Mu, G = NULL, Ts = NULL, Y = NULL, U = NULL){
   Tau <- Mu * Lambda
+  N <- dim(X)[1]
+  K <- dim(Lambda)[1]
   if (is.null(U)){
     U <- matrix(NA, nrow = N, ncol = K)
     for (i in 1:N){
