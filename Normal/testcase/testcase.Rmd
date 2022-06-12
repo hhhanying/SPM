@@ -15,6 +15,7 @@ install("SPM")
 ```{r}
 library(tidyverse)
 library(SPM)
+library(e1071)
 ```
 
 ```{r}
@@ -135,56 +136,76 @@ save.image("./testcase.Rdata")
 
 
 
+#### Nuts
+```{r}
+# training with Nuts
+start_time <- Sys.time()
+res_NUTS <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+end_time <- Sys.time()
+end_time - start_time # 8.143002 secs
+```
+
 ### BPM
 
 #### VI
 ```{r}
 # training with VI
 start_time <- Sys.time()
-res_VI_BPM <- BPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+res_VI_BPM <- BPM_training_Normal(X = dat[["X"]], b = b, alpha = rep(1, ntopic), mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, ntopic = ntopic, VI = TRUE, nskip = 2, seed = 1)
 end_time <- Sys.time()
-end_time - start_time # 8.143002 secs
+end_time - start_time # 1.357542 mins
 ```
 
 ```{r}
 # look at estimate of Mu
 Mu[, 1:5]
-res_VI[["Mu"]][, 1:5]
+res_VI_BPM[["Mu"]][, 1:5]
 ```
 
 ```{r}
 # check estimated membership
-res_VI[["rho"]] # c(0.7, 0.3)
-res_VI[["a"]] # 5
-res_VI[["G"]] # Looks fine
-gtools::rdirichlet(n = 50, alpha = res_VI[["a"]] * res_VI[["rho"]]) # looks fine
+res_VI_BPM[["rho"]] # 0.2538863 0.2345773 0.2254665 0.2860700
+res_VI_BPM[["a"]] # 3.049313
+res_VI_BPM[["U"]] # Looks fine
+gtools::rdirichlet(n = 50, alpha = res_VI_BPM[["a"]] * res_VI_BPM[["rho"]]) # looks fine
 ```
 
 ```{r}
 # compare estimate of distribution for training set
 para1 <- get_parameters_Normal(X = dat[["X"]], Lambda = Lambda, Mu = Mu, U = dat[["U"]])
-para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = res_VI[["G"]], Y = dat[["Y"]], Ts = Ts)
+para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_VI_BPM[["Lambda"]], Mu = res_VI_BPM[["Mu"]], U = res_VI_BPM[["U"]])
 (para1[["MuX"]])[1:5, 1:5]
+(para1[["SigmaX"]])[1:5, 1:5]
+(para2[["SigmaX"]])[1:5, 1:5]
 (para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+sum(abs(para1[["MuX"]] - para2[["MuX"]]) / sqrt(para2[["SigmaX"]]) > 3) / N / d # 0.028
 ```
 
+The difference between distribution means are quite large. But most of them are still within 3 sigma of estimated distributions.
+
 ```{r}
-### test accuracy
-prediction_VI <- SPM_predicting_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, nsample = nsample, seed = 1, w = NULL)
-sum(prediction_VI[["labels"]] == dat2[["Y"]]) # 100
+# estimate memberships
+U_VI <- BPM_membership_Normal(X = dat2[["X"]], Lambda = res_VI_BPM[["Lambda"]], Mu = res_VI_BPM[["Mu"]], a = res_VI_BPM[["a"]], rho = res_VI_BPM[["rho"]], VI = TRUE, nskip = 2, seed = 1)
+```
+
+
+```{r}
+# test accuracy
+svm_VI <- svm(factor(dat[["Y"]]) ~ res_VI_BPM[["U"]]) # train SVM
+prediction_VI_BPM <- predict(svm_VI, U_VI)
+sum(prediction_VI_BPM == factor(dat2[["Y"]])) # 45
 ```
 
 ```{r}
 # check estimated memberships
-G_VI <- SPM_membership_Normal(X = dat2[["X"]], Y = prediction_VI[["labels"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, VI = TRUE, nskip = 2, seed = 1)
-
 corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
-corrplot::corrplot(cor(t(U(G_VI, prediction_VI[["labels"]], Ts))))
+corrplot::corrplot(cor(t(U_VI)))
+cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))) - cor(t(U_VI))
 ```
 ```{r}
 # compare estimated distribution
 para1 <- get_parameters_Normal(X = dat2[["X"]], Lambda = Lambda, Mu = Mu, U = dat2[["U"]])
-para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = G_VI, Y = prediction_VI[["labels"]], Ts = Ts)
+para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_VI_BPM[["Lambda"]], Mu = res_VI_BPM[["Mu"]], U = U_VI)
 (para1[["MuX"]])[1:5, 1:5]
 (para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
 ```
@@ -193,7 +214,7 @@ para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu 
 save.image("./testcase.Rdata")
 ```
 
-
+#### Nuts
 
 
 
