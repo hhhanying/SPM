@@ -525,7 +525,7 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
       int<lower=0> d; //dim of data
       
       real<lower=0> a;
-      simplex[ntopic] rho;
+      vector[ntopic] rho;
   
       matrix[N, d] X;
 
@@ -594,7 +594,7 @@ BPM_membership_Normal <- function(X, Lambda, Mu, a, rho, VI = FALSE, ntrace = 10
   U <- matrix(NA, nrow = N, ncol = ntopic)
   for (i1 in 1:N){
     for(i2 in 1:ntopic){
-      varname <- sprintf("G[%s,%s]", i1, i2)
+      varname <- sprintf("U[%s,%s]", i1, i2)
       U[i1, i2] <- mean(trace[, varname])
     }
   } 
