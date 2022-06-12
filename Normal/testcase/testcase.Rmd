@@ -19,8 +19,8 @@ library(SPM)
 
 ```{r}
 # read parameters
-k0 <- 2
-k1 <- 3
+k0 <- 1
+k1 <- 1
 nlabel <- 3
 
 d <- 20
@@ -28,7 +28,7 @@ d <- 20
 N = 100
 
 mu_Mu = 0
-sigma2_Mu = 50
+sigma2_Mu = 10
 alpha_Lambda = 2
 beta_Lambda=4
 
@@ -39,7 +39,7 @@ K <- nlabel * k0 + k1
 ntopic <- K
 
 b <- 0.1
-alpha <- c(3,3,3,2,2)
+alpha <- c(1,1)
 
 Ts <- T_generator(k0, k1, nlabel)
 
@@ -67,10 +67,141 @@ nsample <- 1000
 #### simulating data
 
 ```{r}
-dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed)
+dat <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed = 1)
+dat2 <- document_generator_Normal(a, rho, Ts, Lambda, Tau, N, NULL, seed = 2)
 ```
 
 ### SPM
+
+#### VI
+```{r}
+# training with VI
+start_time <- Sys.time()
+res_VI <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+end_time <- Sys.time()
+end_time - start_time # 8.143002 secs
+```
+
+```{r}
+# look at estimate of Mu
+Mu[, 1:5]
+res_VI[["Mu"]][, 1:5]
+```
+
+```{r}
+# check estimated membership
+res_VI[["rho"]] # c(0.7, 0.3)
+res_VI[["a"]] # 5
+res_VI[["G"]] # Looks fine
+gtools::rdirichlet(n = 50, alpha = res_VI[["a"]] * res_VI[["rho"]]) # looks fine
+```
+
+```{r}
+# compare estimate of distribution for training set
+para1 <- get_parameters_Normal(X = dat[["X"]], Lambda = Lambda, Mu = Mu, U = dat[["U"]])
+para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = res_VI[["G"]], Y = dat[["Y"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+### test accuracy
+prediction_VI <- SPM_predicting_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, nsample = nsample, seed = 1, w = NULL)
+sum(prediction_VI[["labels"]] == dat2[["Y"]]) # 100
+```
+
+```{r}
+# check estimated memberships
+G_VI <- SPM_membership_Normal(X = dat2[["X"]], Y = prediction_VI[["labels"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, VI = TRUE, nskip = 2, seed = 1)
+
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U(G_VI, prediction_VI[["labels"]], Ts))))
+```
+```{r}
+# compare estimated distribution
+para1 <- get_parameters_Normal(X = dat2[["X"]], Lambda = Lambda, Mu = Mu, U = dat2[["U"]])
+para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = G_VI, Y = prediction_VI[["labels"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+save.image("./testcase.Rdata")
+```
+
+
+
+
+
+
+
+### BPM
+
+#### VI
+```{r}
+# training with VI
+start_time <- Sys.time()
+res_VI_BPM <- BPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+end_time <- Sys.time()
+end_time - start_time # 8.143002 secs
+```
+
+```{r}
+# look at estimate of Mu
+Mu[, 1:5]
+res_VI[["Mu"]][, 1:5]
+```
+
+```{r}
+# check estimated membership
+res_VI[["rho"]] # c(0.7, 0.3)
+res_VI[["a"]] # 5
+res_VI[["G"]] # Looks fine
+gtools::rdirichlet(n = 50, alpha = res_VI[["a"]] * res_VI[["rho"]]) # looks fine
+```
+
+```{r}
+# compare estimate of distribution for training set
+para1 <- get_parameters_Normal(X = dat[["X"]], Lambda = Lambda, Mu = Mu, U = dat[["U"]])
+para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = res_VI[["G"]], Y = dat[["Y"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+### test accuracy
+prediction_VI <- SPM_predicting_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, nsample = nsample, seed = 1, w = NULL)
+sum(prediction_VI[["labels"]] == dat2[["Y"]]) # 100
+```
+
+```{r}
+# check estimated memberships
+G_VI <- SPM_membership_Normal(X = dat2[["X"]], Y = prediction_VI[["labels"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, VI = TRUE, nskip = 2, seed = 1)
+
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U(G_VI, prediction_VI[["labels"]], Ts))))
+```
+```{r}
+# compare estimated distribution
+para1 <- get_parameters_Normal(X = dat2[["X"]], Lambda = Lambda, Mu = Mu, U = dat2[["U"]])
+para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], G = G_VI, Y = prediction_VI[["labels"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+save.image("./testcase.Rdata")
+```
+
+
+
+
+
+
+
+
+
+
 
 #### training
 ```{r}
@@ -81,13 +212,7 @@ end_time <- Sys.time()
 end_time - start_time
 print(end_time)
 ```
-```{r}
-# Variational inference
-start_time <- Sys.time()
-res_VI <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, TRUE, nskip = nskip, seed = seed)
-end_time <- Sys.time()
-end_time - start_time
-```
+
 
 #### predicting
 
@@ -128,7 +253,7 @@ end_time - start_time
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
 corrplot::corrplot(cor(t(U(m_nuts, prediction[['labels']], Ts))))
-
+corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts))))
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
 
@@ -158,7 +283,7 @@ end_time - start_time
 ```{r}
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(dat[["X"]])))
-corrplot::corrplot(cor(t(U(m1, prediction[['labels']], Ts)))) # spm
+corrplot::corrplot(cor(t(res_BPM[["U"]]))) # BPM
 corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
 corrplot::corrplot(cor(t(res_BPM_VI[["U"]]))) # BPM
 ```
