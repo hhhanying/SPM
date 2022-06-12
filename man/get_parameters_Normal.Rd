@@ -4,7 +4,7 @@
 \alias{get_parameters_Normal}
 \title{Calculate the generated distribution given the membership and the topics.}
 \usage{
-get_parameters_Normal(X, Y, G, Ts, Lambda, Mu)
+get_parameters_Normal(X, Lambda, Mu, G = NULL, Ts = NULL, Y = NULL, U = NULL)
 }
 \value{
 A list of the parameters of the distributions of data given its memberships.
