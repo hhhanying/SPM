@@ -140,9 +140,57 @@ save.image("./testcase.Rdata")
 ```{r}
 # training with Nuts
 start_time <- Sys.time()
-res_NUTS <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+res_NUTS <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = b, alpha = alpha, mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = FALSE, nchain = 1, nskip = 2, seed = 1)
 end_time <- Sys.time()
-end_time - start_time # 8.143002 secs
+end_time - start_time # 5.250796 mins
+```
+
+```{r}
+# look at estimate of Mu
+Mu[, 1:5]
+res_NUTS[["Mu"]][, 1:5]
+```
+
+```{r}
+# check estimated membership
+res_NUTS[["rho"]] # 0.742701 0.257299
+res_NUTS[["a"]] # 11.95629
+res_NUTS[["G"]] # Looks fine
+gtools::rdirichlet(n = 50, alpha = res_NUTS[["a"]] * res_NUTS[["rho"]]) # looks fine
+```
+
+```{r}
+# compare estimate of distribution for training set
+para1 <- get_parameters_Normal(X = dat[["X"]], Lambda = Lambda, Mu = Mu, U = dat[["U"]])
+para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_NUTS[["Lambda"]], Mu = res_NUTS[["Mu"]], G = res_NUTS[["G"]], Y = dat[["Y"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+### test accuracy
+prediction_NUTS <- SPM_predicting_Normal(X = dat2[["X"]], Lambda = res_NUTS[["Lambda"]], Mu = res_NUTS[["Mu"]], a = res_NUTS[["a"]], rho = res_NUTS[["rho"]], Ts = Ts, nsample = nsample, seed = 1, w = NULL)
+sum(prediction_NUTS[["labels"]] == dat2[["Y"]]) # 100
+```
+
+```{r}
+# check estimated memberships
+G_NUTS <- SPM_membership_Normal(X = dat2[["X"]], Y = prediction_NUTS[["labels"]], Lambda = res_NUTS[["Lambda"]], Mu = res_NUTS[["Mu"]], a = res_NUTS[["a"]], rho = res_NUTS[["rho"]], Ts = Ts, VI = TRUE, nskip = 2, seed = 1)
+
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U(G_NUTS, prediction_NUTS[["labels"]], Ts))))
+```
+
+```{r}
+# compare estimated distribution
+para1 <- get_parameters_Normal(X = dat2[["X"]], Lambda = Lambda, Mu = Mu, U = dat2[["U"]])
+para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_NUTS[["Lambda"]], Mu = res_NUTS[["Mu"]], G = G_NUTS, Y = prediction_NUTS[["labels"]], Ts = Ts)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+save.image("./testcase.Rdata")
 ```
 
 ### BPM
