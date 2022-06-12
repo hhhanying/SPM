@@ -216,38 +216,79 @@ save.image("./testcase.Rdata")
 
 #### Nuts
 
-
-
-
-
-
-
-
-
-#### training
 ```{r}
-# NUTS sampler
+# training with NUTS
 start_time <- Sys.time()
-res_nuts <- SPM_training_Normal(dat[["X"]], dat[["Y"]], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, FALSE, ntrace, nchain, nskip, seed)
+res_NUTS_BPM <- BPM_training_Normal(X = dat[["X"]], b = b, alpha = rep(1, ntopic), mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, ntopic = ntopic, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1)
 end_time <- Sys.time()
-end_time - start_time
-print(end_time)
+end_time - start_time # 6.224568 mins
 ```
-
-
-#### predicting
 
 ```{r}
-# use results from sampling
-prediction_nuts <- SPM_predicting_Normal(dat[["X"]], res_nuts[["Lambda"]], res_nuts[["Mu"]], res_nuts[["a"]], res_nuts[["rho"]], Ts, nsample, seed, w = NULL) 
-sum(prediction_nuts[["labels"]] == dat[["Y"]])
-# use results from VI
-prediction_VI <- SPM_predicting_Normal(dat[["X"]], res_VI[["Lambda"]], res_VI[["Mu"]], res_VI[["a"]], res_VI[["rho"]], Ts, nsample, seed, w = NULL)
-sum(prediction_VI[["labels"]] == dat[["Y"]])
-# use true parameters
-prediction_true <- SPM_predicting_Normal(dat[["X"]], Lambda, Mu, a, rho, Ts, nsample, seed, w = NULL)
-sum(prediction_true[["labels"]] == dat[["Y"]])
+# look at estimate of Mu
+Mu[, 1:5]
+res_NUTS_BPM[["Mu"]][, 1:5]
 ```
+
+```{r}
+# check estimated membership
+res_NUTS_BPM[["rho"]] # 0.2088413 0.2472414 0.2968298 0.2470875
+res_NUTS_BPM[["a"]] # 0.4785404
+sum((res_NUTS_BPM[["U"]]) > 0.8) / N # 0.71 tends to attribute the data point to a dominant class
+sum(gtools::rdirichlet(n = 50, alpha = res_NUTS_BPM[["a"]] * res_NUTS_BPM[["rho"]]) > 0.8) / 50 # 0.54
+```
+
+```{r}
+# check estimated memberships
+corrplot::corrplot(cor(t(U(dat[["G"]], dat[["Y"]], Ts))))
+corrplot::corrplot(cor(t(res_NUTS_BPM[["U"]])))
+# overall, it's very similar
+```
+
+```{r}
+# compare estimate of distribution for training set
+para1 <- get_parameters_Normal(X = dat[["X"]], Lambda = Lambda, Mu = Mu, U = dat[["U"]])
+para2 <- get_parameters_Normal(X = dat[["X"]], Lambda = res_NUTS_BPM[["Lambda"]], Mu = res_NUTS_BPM[["Mu"]], U = res_NUTS_BPM[["U"]])
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["SigmaX"]])[1:5, 1:5]
+(para2[["SigmaX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5] # seems even closer than SPM
+sum(abs(para1[["MuX"]] - para2[["MuX"]]) / sqrt(para2[["SigmaX"]]) > 3) / N / d # 0
+```
+
+```{r}
+# estimate memberships
+U_NUTS <- BPM_membership_Normal(X = dat2[["X"]], Lambda = res_NUTS_BPM[["Lambda"]], Mu = res_NUTS_BPM[["Mu"]], a = res_NUTS_BPM[["a"]], rho = res_NUTS_BPM[["rho"]], VI = FALSE, nchain = 1, nskip = 2, seed = 1)
+```
+
+```{r}
+# test accuracy
+svm_NUTS <- svm(factor(dat[["Y"]]) ~ res_NUTS_BPM[["U"]]) # train SVM
+
+prediction_NUTS_BPM <- predict(svm_NUTS, res_NUTS_BPM[["U"]])
+sum(prediction_NUTS_BPM == factor(dat[["Y"]])) # 100
+```
+
+```{r}
+# compare estimated distribution
+para1 <- get_parameters_Normal(X = dat2[["X"]], Lambda = Lambda, Mu = Mu, U = dat2[["U"]])
+para2 <- get_parameters_Normal(X = dat2[["X"]], Lambda = res_NUTS_BPM[["Lambda"]], Mu = res_NUTS_BPM[["Mu"]], U = U_NUTS)
+(para1[["MuX"]])[1:5, 1:5]
+(para1[["MuX"]] - para2[["MuX"]])[1:5, 1:5]
+```
+
+```{r}
+save.image("./testcase.Rdata")
+```
+
+
+
+
+
+
+
+
+
 
 #### estimating memberships
 
@@ -373,29 +414,10 @@ for(i in seq(0.1, 0.9, by = 0.1)){
   print(sum(t1<i))
 }
 ```
-```{r}
-k0 = 2
-k1 = 5
-rhos <- gtools::rdirichlet(n = 1000, alpha = rep(1, 7))
-t1 = rhos[,1] + rhos[, 2]
-for(i in seq(0.1, 0.9, by = 0.1)){
-  print(i)
-  print(sum(t1<i))
-}
-```
 
 
 
 
-### Vis
-```{r}
-dat$X %>% 
-  as.data.frame() %>%
-  mutate(label = factor(dat$Y),
-         id = 1:dim(dat$X)[1]) %>%
-  pivot_longer(cols = !c("label", "id"), names_to = "dimension", values_to = "coordinate") %>%
-  arrange(coordinate) %>%
-  ggplot(aes(x = dimension, y = coordinate, color = label, group = id)) +
-  geom_line()
-```
+
+
 
