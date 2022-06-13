@@ -315,6 +315,9 @@ svm_NUTS <- svm(factor(dat[["Y"]]) ~ res_NUTS_BPM[["U"]]) # train SVM
 
 prediction_NUTS_BPM <- predict(svm_NUTS, res_NUTS_BPM[["U"]])
 sum(prediction_NUTS_BPM == factor(dat[["Y"]])) # 100
+
+prediction_NUTS_BPM <- predict(svm_NUTS, U_NUTS)
+sum(prediction_NUTS_BPM == factor(dat2[["Y"]])) # 100
 ```
 
 ```{r}
