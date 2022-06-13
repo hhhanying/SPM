@@ -1,0 +1,98 @@
+---
+title: "SPM_4_class"
+output: html_document
+params:
+  job_id: 1
+  dat_path: "joint_data.csv"
+  confi_file: "configuration_4_class.csv"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+# read parameters
+dat_path <- "../derived_data/joint_data.csv"
+
+alpha, 
+
+configuration <- read.csv(confi_file)
+seed <-configuration$seed[job_id]
+no_fold <-configuration$no_fold[job_id]
+b <-configuration$b[job_id]
+seed <-configuration$[job_id]
+
+ntrace <- 2000
+nchain <- 4
+nskip <- 2
+
+ntopic <- 4
+```
+
+```{r}
+### source files and install packages
+```
+```{r}
+alphas <- c(30.46389, 24.56155, 1.850738)
+betas <- c(3.862334, 3.027876, 2.519860)
+mus <- rep(0, 3)
+
+nview <- c(180, 18, 42)
+mu_Mu <- rep(mus, nview)
+sigma2_Mu <- rep(sigma2s, nview)
+alpha_Lambda <- rep(alphas, nview)
+beta_Lambda <- rep(betas, nview)
+
+
+```
+
+```{r}
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+Ts <- T_generator(k0, k1, nlabel)
+```
+
+```{r}
+dat <- read.csv(dat_path) # read data
+# construct labels
+dat$label <- case_when(dat$Category == "Sepsis" ~ 1,
+                       dat$Category == "Non septic ICU" ~ 2,
+                       dat$Category == "Healthy, no antibiotics" ~ 3,
+                       dat$Category == "Healthy, antibiotics" ~ 4)
+
+X <- data.matrix(dat[, 2: 241])
+Y <- dat$label
+```
+```{r}
+# split training set and test set
+set.seed(seed)
+CV_index <- c()
+for(i in 1:4){
+  subset_index <- which(dat$label == i)
+  tem <- sample(subset_index, length(subset_index))
+  CV_index <- c(CV_index, tem %% 5)
+}
+
+training_index <- which(CV_index != no_fold)
+testing_index <- which(CV_index == no_fold)
+```
+```{r}
+# fit model
+estimate <- SPM_training_Normal(X[training_index,], Y[training_index], Ts, b, alpha, mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip)
+
+save.image(image_name)
+
+# prediction
+prediction <- SPM_predicting_Normal(X[testing_index,], Y[testing_index], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed) 
+
+save.image(image_name)
+
+ncorrect <- sum(prediction[["labels"]] == Y[testing_index])
+save.image(image_name)
+print(ncorrect)
+```
+
+
+
