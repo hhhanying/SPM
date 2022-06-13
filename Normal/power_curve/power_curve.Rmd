@@ -288,7 +288,7 @@ for (i in 2:12){
   dat <- training_dat_generator(r = 1, theta = theta, s = s, N = 100, seed = seed1) # for training
   dat2 <- training_dat_generator(r = 1, theta = theta, s = s, N = 100, seed = seed2) # for testing
   
-  res_VI <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = 0.1, alpha = c(1, 1), mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE, nskip = 2, seed = 1)
+  res_VI <- SPM_training_Normal(X = dat[["X"]], Y = dat[["Y"]], Ts = Ts, b = 0.1, alpha = c(1, 1), mu_Mu = mu_Mu, sigma2_Mu = 1, alpha_Lambda = alpha_Lambda, beta_Lambda = 0.1, VI = TRUE, nskip = 2, seed = 1)
   
   prediction_VI <- SPM_predicting_Normal(X = dat2[["X"]], Lambda = res_VI[["Lambda"]], Mu = res_VI[["Mu"]], a = res_VI[["a"]], rho = res_VI[["rho"]], Ts = Ts, nsample = nsample, seed = 1, w = NULL)
   acc <- sum(prediction_VI[["labels"]] == dat2[["Y"]])
