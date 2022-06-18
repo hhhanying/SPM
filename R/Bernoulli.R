@@ -70,3 +70,32 @@ SPM_simulator_Bernoulli <- function(P = NULL, logits = NULL, Ts = NULL, G = NULL
   
   X
 }
+
+#' Get the parameters for the generated distribution for each data point
+#' 
+#' @export
+get_parameters_Bernoulli <- function(P = NULL, logits = NULL, G = NULL, Ts = NULL, Y = NULL, U = NULL){
+  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if (is.null(U)){ # if given membership need to be transformed
+    N <- length(Y)
+    K <- dim(logits)[1]
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }
+  } 
+  
+  logitX <- U %*% logits 
+  PX <- exp(logitX) / (1 + exp(logitX))
+  
+  list(U = U, PX = PX, logitX = logitX)
+}
+
+
+
+
+
+
