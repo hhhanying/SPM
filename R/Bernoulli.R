@@ -94,8 +94,129 @@ get_parameters_Bernoulli <- function(P = NULL, logits = NULL, G = NULL, Ts = NUL
   list(U = U, PX = PX, logitX = logitX)
 }
 
-
-
+#' Fit the SPM model for Bernoulli distribution.
+#' 
+#' @param save_trace: default to be FALSE. If TRUE will also return the trace.
+#' @export
+SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
+  SPM_Bernoulli_stancode <- "
+  data {
+    int<lower=0> dg;  // dim(membership)
+    int<lower=0> N;  // size of training set
+    int<lower=0> nlabel;
+    int<lower=0> ntopic;
+    int<lower=0> d; //dim of data
+    
+    matrix[N, d] X;
+    int<lower=1> Y[N];         // label, start from 1 
+    
+    matrix[ntopic, dg] T[nlabel];
+    
+    real<lower=0> b;
+    vector<lower=0>[dg] alpha;
+    
+    matrix[ntopic, d] alpha_p;
+    matrix[ntopic, d] beta_p;
+  }
+  parameters {
+    real<lower=0> a;
+    simplex[dg] rho;
+    
+    simplex[dg] G[N];
+    
+    matrix[ntopic, d] P;
+  }
+  model{
+    matrix[ntopic, d] logits;
+    vector[ntopic] U[N];
+    row_vector[d] logit_X[N];
+    
+    a ~ exponential(b);
+    rho ~ dirichlet(alpha);
+  
+    // topics
+    for (i in 1:ntopic){
+      P[i] ~ beta(alpha_p, beta_p);
+      logits[i] = logit(P[i]);
+    }
+    
+    for(i in 1:N){
+      G[i] ~ dirichlet(a * rho);
+      U[i] = T[Y[i]] * G[i];
+      logit_X[i] = U[i]' * logits;
+      X[i] ~ bernoulli_logit(logit_X[i]);
+    }
+  }
+  "
+  
+  N <- length(Y)
+  nlabel <- dim(Ts)[1]
+  dg <- dim(Ts)[3]
+  ntopic <- dim(Ts)[2]
+  d <- dim(X)[2]
+  K <- ntopic
+  
+  dat_fit <- list(
+    dg = dg, N = N, nlabel = nlabel, ntopic = ntopic, d = d,
+    X = X, Y = Y, T = Ts,
+    b = b, alpha = alpha,
+    alpha_p = trans_to_matrix(alpha_p, ntopic, d), 
+    beta_p = trans_to_matrix(beta_p, ntopic, d)
+  )
+  
+  if(VI){
+    model <- rstan::stan_model(model_code = SPM_Bernoulli_stancode)
+    fit_train <- rstan::vb(model, data = dat_fit, seed = seed)
+  } else{
+    fit_train <-rstan::stan(model_code = SPM_Bernoulli_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)    
+  }
+  
+  trace <- as.matrix(fit_train)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  paras <- c("G", "P")
+  d1s <- c(N, K)
+  d2s <- c(dg, d)
+  for (i in 1:length(paras)){
+    para <- paras[i]
+    d1 <- d1s[i]
+    d2 <- d2s[i]
+    tem <- matrix(NA, nrow = d1, ncol = d2)
+    for (i1 in 1:d1){
+      for(i2 in 1:d2){
+        varname <- sprintf("%s[%s,%s]", para, i1, i2)
+        tem[i1, i2] <- mean(trace[, varname])
+      }
+    } 
+    res[[para]] <- tem
+  }  
+  
+  res[["a"]] <- mean(trace[, "a"])
+  
+  tem <- rep(0, dg)
+  for (i in 1:dg){
+    varname <- sprintf("rho[%s]", i)
+    tem[i] <- mean(trace[, varname])
+  }
+  res[["rho"]] <- tem
+  
+  res
+}
 
 
 
