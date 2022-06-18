@@ -107,7 +107,7 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE,
     int<lower=0> ntopic;
     int<lower=0> d; //dim of data
     
-    matrix[N, d] X;
+    int<lower=0, upper=1> X[N, d];
     int<lower=1> Y[N];         // label, start from 1 
     
     matrix[ntopic, dg] T[nlabel];
@@ -136,7 +136,7 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE,
   
     // topics
     for (i in 1:ntopic){
-      P[i] ~ beta(alpha_p, beta_p);
+      P[i] ~ beta(alpha_p[i], beta_p[i]);
       logits[i] = logit(P[i]);
     }
     
