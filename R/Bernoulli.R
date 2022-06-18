@@ -34,3 +34,39 @@ document_generator_Bernoulli <- function(a, rho, Ts, N, P = NULL, logits = NULL,
   
   list(X = X, Y = Y, G = G, U = U, PX = PX, logitX = logitX) 
 }
+
+#' Simulate data from given memberships
+#' 
+#' @return A matrix X.
+#' @export
+SPM_simulator_Bernoulli <- function(P = NULL, logits = NULL, Ts = NULL, G = NULL, Y = NULL, U = NULL, seed = NULL){
+  if (!is.null(seed)){ # if seed is provided, set seed
+    set.seed(seed)
+  }  
+  
+  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if(is.null(U)){ # if transformed memberships are not given, calculate it from the untransformed memberships and labels
+    K <- dim(Ts)[2]
+    N <- length(Y)
+    
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }    
+  } else{
+    N <- dim(U)[1]
+  }
+  
+  d <- dim(logits)[2]
+  
+  logitX <- U %*% logits # get parameters for generated distributions
+  PX <- exp(logitX) / (1 + exp(logitX))
+  
+  X <- rbinom(n = N * d, size = 1, prob = as.vector(PX))
+  X <- matrix(X, nrow = N, byrow = FALSE)
+  
+  X
+}
