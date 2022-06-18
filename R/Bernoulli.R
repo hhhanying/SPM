@@ -10,7 +10,7 @@ document_generator_Bernoulli <- function(a, rho, Ts, N, P = NULL, logits = NULL,
     set.seed(seed)
   }  
   
-  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
     logits <- log(P / (1 - P))
   }   
   
@@ -44,7 +44,7 @@ SPM_simulator_Bernoulli <- function(P = NULL, logits = NULL, Ts = NULL, G = NULL
     set.seed(seed)
   }  
   
-  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
     logits <- log(P / (1 - P))
   } 
   
@@ -75,7 +75,7 @@ SPM_simulator_Bernoulli <- function(P = NULL, logits = NULL, Ts = NULL, G = NULL
 #' 
 #' @export
 get_parameters_Bernoulli <- function(P = NULL, logits = NULL, G = NULL, Ts = NULL, Y = NULL, U = NULL){
-  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
     logits <- log(P / (1 - P))
   } 
   
