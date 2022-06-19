@@ -218,7 +218,7 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE,
   res
 }
 
-#' Predict the labels from given topics
+#' Predict the labels from given topics.
 #' 
 #' Use MCMC to calculate the posterior probability for labels and choose the MAP.
 #' 
@@ -261,3 +261,106 @@ SPM_predicting_Bernoulli <- function(X, a, rho, Ts, P = NULL, logits = NULL, w =
   
   list(posterior = probs, labels = Y) # return posterior distributions and the labels
 }
+
+#' Estimate the memberships.
+#' 
+#' @export
+SPM_membership_Bernoulli <- function(X, Y, a, rho, Ts, P = NULL, logits = NULL, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1, save_trace = FALSE){
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  SPM_Bernoulli_membership_stancode <- "
+  data {
+    int<lower=0> dg;  // dim(membership)
+    int<lower=0> N;  // size of training set
+    int<lower=0> nlabel;
+    int<lower=0> ntopic;
+    int<lower=0> d; //dim of data
+    
+    int<lower=0, upper=1> X[N, d];
+    int<lower=1> Y[N];         // label, start from 1 
+    
+    matrix[ntopic, dg] T[nlabel];
+    
+    real<lower=0> a;
+    vector[dg] rho;
+    
+    matrix[ntopic, d] logits;
+  }
+  parameters {
+    simplex[dg] G[N];
+  }
+  model{
+    for (i in 1:N){
+      vector[ntopic] u;
+      row_vector[d] logit_X;
+      
+      G[i] ~ dirichlet(a * rho);
+      
+      u = T[Y[i]] * G[i];
+      logit_X = u' * logits;
+      
+      X[i] ~ bernoulli_logit(logit_X);
+    }
+  }
+  "
+  
+  dg <- dim(Ts)[3]
+  N <- length(Y)
+  nlabel <- dim(Ts)[1]
+  ntopic <- dim(Ts)[2]
+  d <- dim(X)[2]
+  K <- ntopic
+  
+  if(is.matrix(rho)){
+    rho <- as.vector(rho)
+  }
+  
+  dat_fit <- list(
+    dg = dg, N = N, nlabel = nlabel, ntopic = ntopic, d = d,
+    X = X, Y = Y,
+    T = Ts,
+    a = a, rho = rho,
+    logits = logits
+  )
+  
+  if (VI){
+    model <- rstan::stan_model(model_code = SPM_Bernoulli_membership_stancode)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_estimate <-rstan::stan(
+      model_code = SPM_Bernoulli_membership_stancode,
+      data = dat_fit,
+      chains = nchain,
+      iter = ntrace,
+      seed = seed)
+  }
+  
+  trace <- as.matrix(fit_estimate)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]  
+  
+  G <- matrix(NA, nrow = N, ncol = dg)
+  for (i1 in 1:N){
+    for(i2 in 1:dg){
+      varname <- sprintf("G[%s,%s]", i1, i2)
+      G[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  res[["G"]] <- G
+  
+  res
+}
+
+
