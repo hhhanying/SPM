@@ -124,7 +124,7 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE,
     
     simplex[dg] G[N];
     
-    matrix[ntopic, d] P;
+    matrix<lower=0, upper=1>[ntopic, d] P;
   }
   model{
     matrix[ntopic, d] logits;
@@ -218,5 +218,46 @@ SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE,
   res
 }
 
-
-
+#' Predict the labels from given topics
+#' 
+#' Use MCMC to calculate the posterior probability for labels and choose the MAP.
+#' 
+#' @param w: the prior distribution of the labels. Default to be NULL, meaning uniform distribution.
+#' @param nsample: the sample size to draw for estimating the posterior probability.
+#' @export
+SPM_predicting_Bernoulli <- function(X, a, rho, Ts, P = NULL, logits = NULL, w = NULL, nsample = 1000, seed = NULL){
+  if (!is.null(seed)){ # if seed is provided, set seed
+    set.seed(seed)
+  }  
+  
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if (is.null(w)) { # if no information about the prior of labels, treat it as uniform
+    w <- rep(1, nlabel) 
+  }
+  
+  nlabel <- dim(Ts)[1]
+  N <- dim(X)[1]  
+  
+  probs <- matrix(NA, nrow = N, ncol = nlabel) # stores the posterior probability of labels
+  Y <- rep(0, N)
+  
+  for(i in 1:N){ # for each data point
+    G <- gtools::rdirichlet(n = nsample, alpha = a * rho) # draw G
+    
+    for(y in 1:nlabel){ # calculate log posterior for each possible label
+      U <- G %*% t(Ts[y,,]) # nsample * K
+      x <- matrix(rep(X[i,], nsample), nrow = nsample, byrow = TRUE) # each row is X[i]
+      logitX <- U %*% logits 
+      logP <- x * logitX - log(1 + exp(logitX)) # logP[i1, i2] = log P(X[i, i2] | G = G[i1], Y = y)
+      logPX <- apply(logP, 1, sum) # logPX[j] = log P(X| G = G[j])
+      probs[i, y] <- matrixStats::logSumExp(logPX) + log(w[y]) # should actually - log(nsample)
+    }
+    
+    Y[i] <- which.max(probs[i,]) # get the posterior estimate 
+  }
+  
+  list(posterior = probs, labels = Y) # return posterior distributions and the labels
+}
