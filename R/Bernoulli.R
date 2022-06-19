@@ -450,8 +450,7 @@ BPM_training_Bernoulli <- function(X, b, alpha, alpha_p, beta_p, ntopic, VI = FA
   nsave <- nsample %/% nskip
   index_save <- (1:nsave) * nskip
   trace <- trace[index_save,]
-  
-  res <- list()
+
   
   paras <- c("U", "P")
   d1s <- c(N, K)
