@@ -406,7 +406,7 @@ BPM_training_Bernoulli <- function(X, b, alpha, alpha_p, beta_p, ntopic, VI = FA
       
       logit_X = U[i]' * logits;
       
-      X[i] ~ bernoulli_logit(logit_X[i]);
+      X[i] ~ bernoulli_logit(logit_X);
     }
   }
   "
