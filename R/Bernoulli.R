@@ -262,7 +262,7 @@ SPM_predicting_Bernoulli <- function(X, a, rho, Ts, P = NULL, logits = NULL, w =
   list(posterior = probs, labels = Y) # return posterior distributions and the labels
 }
 
-#' Fit the BPM model for Bernoulli distribution.
+#' Estimate the membership under SPM model.
 #' 
 #' @export
 SPM_membership_Bernoulli <- function(X, Y, a, rho, Ts, P = NULL, logits = NULL, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1, save_trace = FALSE){
@@ -363,7 +363,9 @@ SPM_membership_Bernoulli <- function(X, Y, a, rho, Ts, P = NULL, logits = NULL, 
   res
 }
 
+#' Fit the BPM model for Bernoulli distribution.
 #' 
+#' @export
 BPM_training_Bernoulli <- function(X, b, alpha, alpha_p, beta_p, ntopic, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
   BPM_Bernoulli_stancode <-"
   data {
@@ -477,6 +479,97 @@ BPM_training_Bernoulli <- function(X, b, alpha, alpha_p, beta_p, ntopic, VI = FA
     tem[i] <- mean(trace[, varname])
   }
   res[["rho"]] <- tem
+  
+  res
+}
+
+#' Estimate the membership under BPM model.
+#' 
+#' @export
+BPM_membership_Bernoulli <- function(X, a, rho, P = NULL, logits = NULL, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1, save_trace = FALSE){
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  BPM_Bernoulli_membership_stancode <-"
+  data {
+      int<lower=0> N;  // size of training set
+      int<lower=0> ntopic;
+      int<lower=0> d; //dim of data
+      
+      real<lower=0> a;
+      vector[ntopic] rho;
+  
+      int<lower=0, upper=1> X[N, d];
+
+      matrix[ntopic, d] logits;
+  
+  }
+  parameters {
+      simplex[ntopic] U[N];
+  }
+  model{
+      for (i in 1:N){
+          row_vector[d] logit_X;
+          
+          U[i] ~ dirichlet(a * rho);
+  
+          logit_X = U[i]' * logits;
+  
+          X[i] ~ bernoulli_logit(logit_X);
+      }
+  }
+  "
+  
+  # calculate needed parameters (avoid too many inputs)
+  N <- dim(X)[1]
+  d <- dim(X)[2]
+  ntopic <- dim(logits)[1]
+  K <- ntopic
+  
+  dat_fit <- list(
+    N = N, ntopic = ntopic, d = d,
+    a = a, rho = rho,
+    X = X,
+    logits = logits
+  )
+  
+  # sampling
+  if(VI){
+    model <- rstan::stan_model(model_code = BPM_Bernoulli_membership_stancode)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_estimate <-rstan::stan(
+      model_code = BPM_Bernoulli_membership_stancode,
+      data = dat_fit,
+      chains = nchain,
+      iter = ntrace,
+      seed = seed)
+  }
+  
+  trace <- as.matrix(fit_estimate)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  U <- matrix(NA, nrow = N, ncol = ntopic)
+  for (i1 in 1:N){
+    for(i2 in 1:ntopic){
+      varname <- sprintf("U[%s,%s]", i1, i2)
+      U[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  res[["U"]] <- U
   
   res
 }
