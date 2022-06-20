@@ -86,7 +86,8 @@ testing <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = Ntest, P 
 ```
 ```{r}
 if (model == "SPM"){
-  estimate <- SPM_training_Normal(X = training$X, Y = training$Y, Ts = Ts, b = b, alpha = alpha, alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+  estimate <- SPM_training_Bernoulli(X = training$X, Y = training$Y, Ts = Ts, b = b, alpha = rep(1, k0 + k1), alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+
   prediction <- SPM_predicting_Bernoulli(X = testing[["X"]], a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P)
   save.image(image_name)
   
@@ -99,7 +100,7 @@ if (model == "SPM"){
 }else{
   estimate <- BPM_training_Bernoulli(X = training$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = FALSE)
   save.image(image_name)
-  membership <-  BPM_membership_Bernoulli(X = testing$X, a = estimate[["a"]], rho = estimate[["rho"]], P = estimate[["P"]], VI = FALSE)
+  membership <-  BPM_membership_Bernoulli(X = testing$X, a = estimate[["a"]], rho = estimate[["rho"]], P = estimate[["P"]], VI = TRUE)
   save.image(image_name)
   
   svm_BPM <- svm(factor(training[["Y"]]) ~ estimate[["U"]])
