@@ -1,5 +1,5 @@
 ---
-title: "configuration"
+title: "Bernoulli_configuration"
 output: html_document
 ---
 
@@ -58,11 +58,10 @@ id <- 1:dim(confi)[1]
 memory <- case_when(confi$d == 50 ~ 3.5,
                     confi$d == 200 ~ 10,
                     confi$d == 800 ~ 15)
-disk <- case_when(confi$d == 50 ~ 300000,
-                    confi$d == 200 ~ 10,
-                    confi$d == 800 ~ 15)
+disk <- case_when(confi$d == 50 ~ 5000,
+                    confi$d == 200 ~ 10000,
+                    confi$d == 800 ~ 20000)
 params <- data.frame(id = id, memory = memory, disk = disk)
-params <- data.frame(id = 1, memory = 4.5, disk = 300000)
 para_path <- "../submit/CHTC_params.txt"
 write.table(params, file = para_path, sep=",", row.names=FALSE, col.names = FALSE, quote = FALSE)
 ```
