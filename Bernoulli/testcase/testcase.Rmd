@@ -1,0 +1,657 @@
+---
+title: "testcase"
+output: html_document
+date: '2022-06-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(SPM)
+library(e1071)
+```
+
+```{r}
+
+document_generator_Bernoulli <- function(a, rho, Ts, N, P = NULL, logits = NULL, w = NULL, seed = NULL){
+  if (!is.null(seed)){ # if seed is provided, set seed
+    set.seed(seed)
+  }  
+  
+  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  }   
+  
+  # get necessary parameters
+  nlabel <- dim(Ts)[1]
+  d <- dim(logits)[2]
+  K <- dim(Ts)[2]
+  
+  Y <- sample(x = nlabel, size = N, replace = TRUE, prob = w) # sample labels
+  G <- gtools::rdirichlet(n = N, alpha = a * rho) # sample memberships
+  U <- matrix(NA, nrow = N, ncol = K) # transform memberships
+  for (i in 1:N){
+    U[i,] <- Ts[Y[i], ,] %*% G[i,]
+  }  
+  print(U)
+  print(class(logits))
+  print(class(U))
+  logitX <- U %*% logits # get parameters for generated distributions
+  PX <- exp(logitX) / (1 + exp(logitX))
+  
+  X <- rbinom(n = N * d, size = 1, prob = as.vector(PX))
+  X <- matrix(X, nrow = N, byrow = FALSE)
+  
+  list(X = X, Y = Y, G = G, U = U, PX = PX, logitX = logitX) 
+}
+
+SPM_simulator_Bernoulli <- function(P = NULL, logits = NULL, Ts = NULL, G = NULL, Y = NULL, U = NULL, seed = NULL){
+  if (!is.null(seed)){ # if seed is provided, set seed
+    set.seed(seed)
+  }  
+  
+  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if(is.null(U)){ # if transformed memberships are not given, calculate it from the untransformed memberships and labels
+    K <- dim(Ts)[2]
+    N <- length(Y)
+
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }    
+  } else{
+    N <- dim(U)[1]
+  }
+
+  d <- dim(logits)[2]
+  
+  logitX <- U %*% logits # get parameters for generated distributions
+  PX <- exp(logitX) / (1 + exp(logitX))
+  
+  X <- rbinom(n = N * d, size = 1, prob = as.vector(PX))
+  X <- matrix(X, nrow = N, byrow = FALSE)
+  
+  X
+}
+  
+get_parameters_Bernoulli <- function(P = NULL, logits = NULL, G = NULL, Ts = NULL, Y = NULL, U = NULL){
+  if (!is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if (is.null(U)){ # if given membership need to be transformed
+    N <- length(Y)
+    K <- dim(logits)[1]
+    U <- matrix(NA, nrow = N, ncol = K)
+    for (i in 1:N){
+      U[i,] <- Ts[Y[i], ,] %*% G[i,]
+    }
+  } 
+  
+  logitX <- U %*% logits 
+  PX <- exp(logitX) / (1 + exp(logitX))
+  
+  list(U = U, PX = PX, logitX = logitX)
+}
+
+SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
+  SPM_Bernoulli_stancode <- "
+  data {
+    int<lower=0> dg;  // dim(membership)
+    int<lower=0> N;  // size of training set
+    int<lower=0> nlabel;
+    int<lower=0> ntopic;
+    int<lower=0> d; //dim of data
+    
+    matrix[N, d] X;
+    int<lower=1> Y[N];         // label, start from 1 
+    
+    matrix[ntopic, dg] T[nlabel];
+    
+    real<lower=0> b;
+    vector<lower=0>[dg] alpha;
+    
+    matrix[ntopic, d] alpha_p;
+    matrix[ntopic, d] beta_p;
+  }
+  parameters {
+    real<lower=0> a;
+    simplex[dg] rho;
+    
+    simplex[dg] G[N];
+    
+    matrix[ntopic, d] P;
+  }
+  model{
+    matrix[ntopic, d] logits;
+    vector[ntopic] U[N];
+    row_vector[d] logit_X[N];
+    
+    a ~ exponential(b);
+    rho ~ dirichlet(alpha);
+  
+    // topics
+    for (i in 1:ntopic){
+      P[i] ~ beta(alpha_p, beta_p);
+      logits[i] = logit(P[i]);
+    }
+    
+    for(i in 1:N){
+      G[i] ~ dirichlet(a * rho);
+      U[i] = T[Y[i]] * G[i];
+      logit_X[i] = U[i]' * logits;
+      X[i] ~ bernoulli_logit(logit_X[i]);
+    }
+  }
+  "
+  
+  N <- length(Y)
+  nlabel <- dim(Ts)[1]
+  dg <- dim(Ts)[3]
+  ntopic <- dim(Ts)[2]
+  d <- dim(X)[2]
+  K <- ntopic
+  
+  dat_fit <- list(
+    dg = dg, N = N, nlabel = nlabel, ntopic = ntopic, d = d,
+    X = X, Y = Y, T = Ts,
+    b = b, alpha = alpha,
+    alpha_p = trans_to_matrix(alpha_p, ntopic, d), 
+    beta_p = trans_to_matrix(beta_p, ntopic, d)
+  )
+  
+  if(VI){
+    model <- rstan::stan_model(model_code = SPM_Bernoulli_stancode)
+    fit_train <- rstan::vb(model, data = dat_fit, seed = seed)
+  } else{
+    fit_train <-rstan::stan(model_code = SPM_Bernoulli_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)    
+  }
+  
+  trace <- as.matrix(fit_train)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+
+  paras <- c("G", "P")
+  d1s <- c(N, K)
+  d2s <- c(dg, d)
+  for (i in 1:length(paras)){
+    para <- paras[i]
+    d1 <- d1s[i]
+    d2 <- d2s[i]
+    tem <- matrix(NA, nrow = d1, ncol = d2)
+    for (i1 in 1:d1){
+      for(i2 in 1:d2){
+        varname <- sprintf("%s[%s,%s]", para, i1, i2)
+        tem[i1, i2] <- mean(trace[, varname])
+      }
+    } 
+    res[[para]] <- tem
+  }  
+  
+  res[["a"]] <- mean(trace[, "a"])
+  
+  tem <- rep(0, dg)
+  for (i in 1:dg){
+    varname <- sprintf("rho[%s]", i)
+    tem[i] <- mean(trace[, varname])
+  }
+  res[["rho"]] <- tem
+  
+  res
+}
+
+  
+
+SPM_predicting_Bernoulli <- function(X, a, rho, Ts, P = NULL, logits = NULL, w = NULL, nsample = 1000, seed = NULL){
+  if (!is.null(seed)){ # if seed is provided, set seed
+    set.seed(seed)
+  }  
+  
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  if (is.null(w)) { # if no information about the prior of labels, treat it as uniform
+    w <- rep(1, nlabel) 
+  }
+  
+  nlabel <- dim(Ts)[1]
+  N <- dim(X)[1]  
+  
+  probs <- matrix(NA, nrow = N, ncol = nlabel) # stores the posterior probability of labels
+  Y <- rep(0, N)
+  
+  for(i in 1:N){ # for each data point
+    G <- gtools::rdirichlet(n = nsample, alpha = a * rho) # draw G
+    
+    for(y in 1:nlabel){ # calculate log posterior for each possible label
+      U <- G %*% t(Ts[y,,]) # nsample * K
+      x <- matrix(rep(X[i,], nsample), nrow = nsample, byrow = TRUE) # each row is X[i]
+      logitX <- U %*% logits 
+      logP <- x * logitX - log(1 + exp(logitX)) # logP[i1, i2] = log P(X[i, i2] | G = G[i1], Y = y)
+      logPX <- apply(logP, 1, sum) # logPX[j] = log P(X| G = G[j])
+      probs[i, y] <- matrixStats::logSumExp(logPX) + log(w[y]) # should actually - log(nsample)
+    }
+    
+  Y[i] <- which.max(probs[i,]) # get the posterior estimate 
+  }
+  
+  list(posterior = probs, labels = Y) # return posterior distributions and the labels
+}
+    
+SPM_membership_Bernoulli <- function(X, Y, a, rho, Ts, P = NULL, logits = NULL, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1, save_trace = FALSE){
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  SPM_Bernoulli_membership_stancode <- "
+  data {
+    int<lower=0> dg;  // dim(membership)
+    int<lower=0> N;  // size of training set
+    int<lower=0> nlabel;
+    int<lower=0> ntopic;
+    int<lower=0> d; //dim of data
+    
+    int<lower=0, upper=1> X[N, d];
+    int<lower=1> Y[N];         // label, start from 1 
+    
+    matrix[ntopic, dg] T[nlabel];
+    
+    real<lower=0> a;
+    vector[dg] rho;
+    
+    matrix[ntopic, d] logits;
+  }
+  parameters {
+    simplex[dg] G[N];
+  }
+  model{
+    for (i in 1:N){
+      vector[ntopic] u;
+      row_vector[d] logit_X;
+      
+      G[i] ~ dirichlet(a * rho);
+      
+      u = T[Y[i]] * G[i];
+      logit_X = u' * logits;
+      
+      X[i] ~ bernoulli_logit(logit_X);
+    }
+  }
+  "
+  
+  dg <- dim(Ts)[3]
+  N <- length(Y)
+  nlabel <- dim(Ts)[1]
+  ntopic <- dim(Ts)[2]
+  d <- dim(X)[2]
+  K <- ntopic
+
+  if(is.matrix(rho)){
+    rho <- as.vector(rho)
+  }
+  
+  dat_fit <- list(
+    dg = dg, N = N, nlabel = nlabel, ntopic = ntopic, d = d,
+    X = X, Y = Y,
+    T = Ts,
+    a = a, rho = rho,
+    logits = logits
+  )
+  
+  if (VI){
+    model <- rstan::stan_model(model_code = SPM_Bernoulli_membership_stancode)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+      fit_estimate <-rstan::stan(
+        model_code = SPM_Bernoulli_membership_stancode,
+        data = dat_fit,
+        chains = nchain,
+        iter = ntrace,
+        seed = seed)
+  }
+  
+  trace <- as.matrix(fit_estimate)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]  
+  
+  G <- matrix(NA, nrow = N, ncol = dg)
+  for (i1 in 1:N){
+    for(i2 in 1:dg){
+      varname <- sprintf("G[%s,%s]", i1, i2)
+      G[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  res[["G"]] <- G
+  
+  res
+}
+
+BPM_training_Bernoulli <- function(X, b, alpha, alpha_p, beta_p, ntopic, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
+  BPM_Bernoulli_stancode <-"
+  data {
+    int<lower=0> N;  // size of training set
+    int<lower=0> ntopic;
+    int<lower=0> d; //dim of data
+    
+    int<lower=0, upper=1> X[N, d];
+    
+    real<lower=0> b;
+    vector<lower=0>[ntopic] alpha;
+    
+    matrix[ntopic, d] alpha_p;
+    matrix[ntopic, d] beta_p;
+  }
+  parameters {
+    real<lower=0> a;
+    simplex[ntopic] rho;
+    
+    simplex[ntopic] U[N];
+    
+    matrix<lower=0, upper=1>[ntopic, d] P;
+  }
+  model{
+    matrix[ntopic, d] logits;
+    
+    a ~ exponential(b);
+    rho ~ dirichlet(alpha);
+    
+    // topics
+    for (i in 1:ntopic){
+      P[i] ~ beta(alpha_p[i], beta_p[i]);
+      logits[i] = logit(P[i]);
+    }
+    
+    for (i in 1:N){
+      row_vector[d] logit_X;
+      
+      U[i] ~ dirichlet(a * rho);
+      
+      logit_X = U[i]' * logits;
+      
+      X[i] ~ bernoulli_logit(logit_X[i]);
+    }
+  }
+  "
+  
+  # calculate needed parameters (avoid too many inputs)
+  N <- dim(X)[1]
+  d <- dim(X)[2]
+  K <- ntopic
+  
+  # the data to fit
+  dat_fit <- list(
+    N = N, ntopic = ntopic, d = d,
+    X = X,
+    b = b, alpha = alpha,
+    alpha_p = trans_to_matrix(alpha_p, ntopic, d), 
+    beta_p = trans_to_matrix(beta_p, ntopic, d)
+  )
+  
+  # sampling
+  if(VI){
+    model <- rstan::stan_model(model_code = BPM_Bernoulli_stancode)
+    fit_train <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_train <-rstan::stan(model_code = BPM_Bernoulli_stancode,
+                            data = dat_fit,
+                            chains = nchain,
+                            iter = ntrace,
+                            seed = seed)
+  }
+
+  trace <- as.matrix(fit_train)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  res <- list()
+  
+  paras <- c("U", "P")
+  d1s <- c(N, K)
+  d2s <- c(ntopic, d)
+  for (i in 1:length(paras)){
+    para <- paras[i]
+    d1 <- d1s[i]
+    d2 <- d2s[i]
+    tem <- matrix(NA, nrow = d1, ncol = d2)
+    for (i1 in 1:d1){
+      for(i2 in 1:d2){
+        varname <- sprintf("%s[%s,%s]", para, i1, i2)
+        tem[i1, i2] <- mean(trace[, varname])
+      }
+    } 
+    res[[para]] <- tem
+  }
+  
+  res[["a"]] <- mean(trace[, "a"])
+  
+  tem <- rep(0, ntopic)
+  for (i in 1:ntopic){
+    varname <- sprintf("rho[%s]", i)
+    tem[i] <- mean(trace[, varname])
+  }
+  res[["rho"]] <- tem
+  
+  res
+}
+ 
+BPM_membership_Bernoulli <- function(X, a, rho, P = NULL, logits = NULL, VI = FALSE, ntrace = 1000, nchain = 2, nskip = 2, seed = 1, save_trace = FALSE){
+  if (is.null(logits)){ # if logits are not provided, calculate it from P
+    logits <- log(P / (1 - P))
+  } 
+  
+  BPM_Bernoulli_membership_stancode <-"
+  data {
+      int<lower=0> N;  // size of training set
+      int<lower=0> ntopic;
+      int<lower=0> d; //dim of data
+      
+      real<lower=0> a;
+      vector[ntopic] rho;
+  
+      int<lower=0, upper=1> X[N, d];
+
+      matrix[ntopic, d] logits;
+  
+  }
+  parameters {
+      simplex[ntopic] U[N];
+  }
+  model{
+      for (i in 1:N){
+          row_vector[d] logit_X;
+          
+          U[i] ~ dirichlet(a * rho);
+  
+          logit_X = u' * logits;
+  
+          X[i] ~ bernoulli_logit(logit_X);
+      }
+  }
+  "
+  
+  # calculate needed parameters (avoid too many inputs)
+  N <- dim(X)[1]
+  d <- dim(X)[2]
+  K <- ntopic
+  
+  dat_fit <- list(
+    N = N, ntopic = ntopic, d = d,
+    a = a, rho = rho,
+    X = X,
+    logits = logits
+  )
+  
+  # sampling
+  if(VI){
+    model <- rstan::stan_model(model_code = BPM_Bernoulli_membership_stancode)
+    fit_estimate <-rstan::vb(model, data = dat_fit, seed = seed)
+  }else{
+    fit_estimate <-rstan::stan(
+      model_code = BPM_Bernoulli_membership_stancode,
+      data = dat_fit,
+      chains = nchain,
+      iter = ntrace,
+      seed = seed)
+  }
+
+  trace <- as.matrix(fit_estimate)
+  
+  res <- list()
+  
+  if(save_trace){
+    res[["trace"]] <- trace
+  }
+  
+  # save results
+  nsample <- dim(trace)[1]
+  nsave <- nsample %/% nskip
+  index_save <- (1:nsave) * nskip
+  trace <- trace[index_save,]
+  
+  U <- matrix(NA, nrow = N, ncol = ntopic)
+  for (i1 in 1:N){
+    for(i2 in 1:ntopic){
+      varname <- sprintf("U[%s,%s]", i1, i2)
+      U[i1, i2] <- mean(trace[, varname])
+    }
+  } 
+  
+  res[["U"]] <- U
+  
+  res
+}
+
+
+```
+
+```{r}
+k0 <- 1
+k1 <- 1
+nlabel <- 3
+d <- 20
+N <- 100
+alpha_p <- 0.5
+beta_p <- 0.5
+seed = 1
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+b <- 0.1
+alpha <- c(1,1)
+Ts <- T_generator(k0, k1, nlabel)
+
+```
+
+```{r}
+set.seed(seed)
+a <- rexp(n = 1, rate = b)
+rho <- gtools::rdirichlet(n = 1, alpha = alpha)
+P <- rbeta(n = ntopic * d, shape1 = alpha_p, shape2 = beta_p) %>%
+  matrix(nrow = K)
+dat1 <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = N, P = P, seed = 1)
+dat2 <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = N, P = P, seed = 2)
+```
+```{r}
+# visualize the parameters
+params_dat1 <- get_parameters_Bernoulli(P = P, U = dat1$U)
+# dat1$PX - params_dat1$PX
+tem <- data.frame(params_dat1$PX[, 1:2], dat1$Y)
+colnames(tem) <- c("X1", "X2", "Y")
+tem %>% ggplot(aes(x = X1, y = X2, color = factor(Y))) +
+  geom_point()
+
+```
+
+```{r}
+SPM_estimate <- SPM_training_Normal(X = dat1$X, Y = dat1$Y, Ts = Ts, b = b, alpha = alpha, alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+```
+```{r}
+SPM_prediction <- SPM_predicting_Bernoulli(X = dat2[["X"]], a = SPM_estimate$a, rho = SPM_estimate$rho, Ts = Ts, P = SPM_estimate$P)
+sum(SPM_prediction$labels == dat2$Y) # 99
+
+G_VI <- SPM_membership_Bernoulli(X = dat2$X, Y = SPM_prediction$labels, a = SPM_estimate$a, rho = SPM_estimate$rho, Ts = Ts, P = SPM_estimate$P, VI = TRUE )
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U(G_VI[["G"]], SPM_prediction[["labels"]], Ts))))
+```
+
+```{r}
+BPM_estimate <- BPM_training_Bernoulli(X = dat1$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = TRUE)
+BPM_estimate_NUTS <- BPM_training_Bernoulli(X = dat1$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = FALSE)
+
+U_VI <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate[["a"]], rho = BPM_estimate[["rho"]], P = BPM_estimate[["P"]], VI = TRUE)
+U_NUTS <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate[["a"]], rho = BPM_estimate[["rho"]], P = BPM_estimate[["P"]], VI = FALSE)
+
+# U_NUTS_VI <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate_NUTS[["a"]], rho = BPM_estimate_NUTS[["rho"]], P = BPM_estimate_NUTS[["P"]], VI = TRUE) failed
+U_NUTS_NUTS <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate_NUTS[["a"]], rho = BPM_estimate_NUTS[["rho"]], P = BPM_estimate_NUTS[["P"]], VI = FALSE)
+
+svm_VI <- svm(factor(dat1[["Y"]]) ~ BPM_estimate[["U"]]) # train SVM
+sum(predict(svm_VI, BPM_estimate[["U"]]) == factor(dat1[["Y"]])) # 100
+sum(predict(svm_VI, U_VI[["U"]]) == factor(dat2[["Y"]])) # 44
+sum(predict(svm_VI, U_NUTS[["U"]]) == factor(dat2[["Y"]])) # 44
+
+svm_NUTS <- svm(factor(dat1[["Y"]]) ~ BPM_estimate_NUTS[["U"]]) # train SVM
+sum(predict(svm_NUTS, BPM_estimate_NUTS[["U"]]) == factor(dat1[["Y"]])) # 98
+# sum(predict(svm_NUTS, U_NUTS_VI[["U"]]) == factor(dat2[["Y"]])) 
+sum(predict(svm_NUTS, U_NUTS_NUTS[["U"]]) == factor(dat2[["Y"]])) # 46
+
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U_VI[["U"]])))
+corrplot::corrplot(cor(t(U_NUTS[["U"]])))
+```
+```{r}
+BPM_estimate2 <- BPM_training_Bernoulli(X = dat1$X, b = b, alpha = rep(1, 2), alpha_p = alpha_p, beta_p = beta_p, ntopic = 2, VI = TRUE)
+
+U_VI2 <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate2[["a"]], rho = BPM_estimate2[["rho"]], P = BPM_estimate2[["P"]], VI = TRUE)
+  
+
+corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
+corrplot::corrplot(cor(t(U_VI2[["U"]])))
+
+svm_VI2 <- svm(factor(dat1[["Y"]]) ~ BPM_estimate2[["U"]]) # train SVM
+sum(predict(svm_VI2, BPM_estimate2[["U"]]) == factor(dat1[["Y"]])) # 88
+sum(predict(svm_VI2, U_VI2[["U"]]) == factor(dat2[["Y"]])) # 39
+
+```
+
+
+
