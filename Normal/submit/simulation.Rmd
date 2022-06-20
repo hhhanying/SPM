@@ -111,7 +111,7 @@ if (balanced == "unbalanced"){
 ```{r}
 # simulate data
 training <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntrain, w, seed)
-testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, w, seed)
+testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, w, seed + 1)
 
 # split for CV
 # CV <- CV_split(Ntrain, no_fold, nfold, seed)
@@ -139,7 +139,8 @@ if (model == "SPM"){
   estimate <- BPM_training_Normal(training[["X"]], b, rep(1, K), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip)
   save.image(image_name)
   # estimate memberships for test set
-  U <- BPM_membership_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], ntrace, nchain, nskip)
+  Us <- BPM_membership_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], ntrace, nchain, nskip)
+  U <- Us
   save.image(image_name)
   
   library(e1071)
