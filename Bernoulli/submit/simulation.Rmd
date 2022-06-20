@@ -1,0 +1,117 @@
+---
+title: "simulation"
+output: html_document
+params:
+  confi_index: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+confi_file <- "configurations.csv"
+confi_index <- as.numeric(params$confi_index)
+confi <- read.csv(confi_file)
+```
+
+```{r}
+library(tidyverse)
+library(e1071)
+source("R/shared.R")
+source("R/Bernoulli.R")
+```
+
+```{r}
+# read parameters from configuration file
+b <- confi$b[confi_index]
+
+alpha_p <- confi$alpha_p[confi_index]
+beta_p <- confi$beta_p[confi_index]
+
+d <- confi$d[confi_index]
+k0 <- confi$k0[confi_index]
+k1 <- confi$k1[confi_index]
+
+nlabel <- confi$nlabel[confi_index]
+model <- confi$model[confi_index]
+weight_shared <- confi$weight_shared[confi_index]
+balanced <- confi$balanced[confi_index]
+seed <- confi$seed[confi_index]
+
+image_name <- paste0(model, confi_index, '.Rdata')
+
+ntrace <- 1000
+nchain <- 1
+nskip <- 2
+
+nsample <- 1000
+
+Ntrain <- 100
+Ntest <- 100
+```
+
+```{r}
+# generate parameter
+dg <- k0 + k1
+K <- nlabel * k0 + k1
+ntopic <- K
+
+Ts <- T_generator(k0, k1, nlabel)
+```
+
+```{r}
+set.seed(seed)
+
+# sample parameters
+
+a <- rexp(n = 1, rate = b)
+
+rho1 <- gtools::rdirichlet(n = 1, alpha = rep(1, k0))
+rho2 <- gtools::rdirichlet(n = 1, alpha = rep(1, k1))
+
+P <- rbeta(n = ntopic * d, shape1 = alpha_p, shape2 = beta_p) %>%
+  matrix(nrow = K)
+
+rho <- c((1 - weight_shared) * rho1, weight_shared * rho2)
+
+w = NULL
+if (balanced == "unbalanced"){
+  w = c(1, 1, 4, 4, 4)
+}
+```
+```{r}
+training <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = Ntrain, P = P, seed = seed)
+testing <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = Ntest, P = P, seed = seed + 1)
+```
+```{r}
+if (model == "SPM"){
+  estimate <- SPM_training_Normal(X = training$X, Y = training$Y, Ts = Ts, b = b, alpha = alpha, alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+  prediction <- SPM_predicting_Bernoulli(X = testing[["X"]], a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P)
+  save.image(image_name)
+  
+  accuracy <- sum(prediction[["labels"]] == testing[["Y"]]) / Ntest
+  print(accuracy)
+  
+  membership <- SPM_membership_Bernoulli(X = testing$X, Y = prediction$labels, a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P, VI = TRUE )
+  
+  save.image(image_name)
+}else{
+  estimate <- BPM_training_Bernoulli(X = training$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = FALSE)
+  save.image(image_name)
+  membership <-  BPM_membership_Bernoulli(X = testing$X, a = estimate[["a"]], rho = estimate[["rho"]], P = estimate[["P"]], VI = FALSE)
+  save.image(image_name)
+  
+  svm_BPM <- svm(factor(training[["Y"]]) ~ estimate[["U"]])
+  prediction <- predict(svm_BPM, membership[["U"]]) == factor(testing[["Y"]])
+  accuracy <- sum(prediction == factor(testing[["Y"]])) / Ntest
+  print(accuracy)
+  
+  save.image(image_name)
+
+}
+```
+
+
+
+

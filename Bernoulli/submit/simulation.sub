@@ -1,0 +1,21 @@
+universe = docker
+docker_image = kosugitti/rstan-env
+
+executable = simulation.sh 
+# rmd script, configurations, source file
+transfer_input_files = /home/hjiang252/SPM/Bernoulli/submit/simulation.Rmd, /home/hjiang252/SPM/Bernoulli/submit/configurations.csv, /home/hjiang252/SPM/R
+
+# requesting resources
+request_memory = $(memory)GB
+request_cpus = 1
+request_disk = $(disk)KB
+
+# parameters
+environment="confi_index=$(confi_index)"
+
+# log files
+error = ./log/simulation$(Process).err
+output = ./log/simulation$(Process).out
+log = ./log/simulation$(Process).log
+
+queue confi_index,memory,disk from CHTC_params.txt

@@ -1,0 +1,69 @@
+---
+title: "configuration"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+nlabel <- 5
+topic_d_ratio <- 0.2
+ds <- c()
+k0s <- c()
+k1s <- c()
+for (d in c(50, 200, 800)){
+  K <- floor(d * topic_d_ratio) # number of total topics
+  max_k0 <- K %/% nlabel
+  ds <- c(ds, rep(d, max_k0))
+  k0s <- c(k0s, 1:max_k0)
+  k1s <- c(k1s, seq(K - nlabel, 0, by = -5))
+}
+confi <- data.frame(d = ds, k0 = k0s, k1 = k1s, seed = 1:length(ds))
+
+weight_shared <- 0.5
+weight_shared <- c(0.5, 0.2)
+weight_shared <- c(0.5)
+balanced <- c("balanced", "unbalanced")
+balanced <- c("balanced")
+
+prior <- data.frame(
+  alpha_p = c(1, 2, 0.5),
+  beta_p = c(1, 5, 0.5)
+)
+# alpha_p <- c(1, 2, 0.5)
+# beta_p <- c(1, 5, 0.5)
+
+model <- c("SPM", "BPM")
+
+C <- 20
+
+confi <- expand_grid(confi, weight_shared, balanced, prior, model) %>%
+  mutate(
+    b = 1 / C / (k0 + k1),
+    nlabel = 5
+  ) %>%
+  arrange(d)
+
+```
+```{r}
+confi_path <- "../submit/configurations.csv"
+write.table(confi, file = confi_path, sep=",", row.names=FALSE)
+```
+```{r}
+confi_path <- "../submit/configurations.csv"
+confi <- read.csv(confi_path)
+id <- 1:dim(confi)[1]
+memory <- case_when(confi$d == 50 ~ 3.5,
+                    confi$d == 200 ~ 10,
+                    confi$d == 800 ~ 15)
+disk <- case_when(confi$d == 50 ~ 300000,
+                    confi$d == 200 ~ 10,
+                    confi$d == 800 ~ 15)
+params <- data.frame(id = id, memory = memory, disk = disk)
+params <- data.frame(id = 1, memory = 4.5, disk = 300000)
+para_path <- "../submit/CHTC_params.txt"
+write.table(params, file = para_path, sep=",", row.names=FALSE, col.names = FALSE, quote = FALSE)
+```
+
