@@ -1,5 +1,5 @@
 ---
-title: "testcase"
+title: "Bernoulli_testcase"
 output: html_document
 date: '2022-06-18'
 ---
@@ -53,7 +53,7 @@ tem %>% ggplot(aes(x = X1, y = X2, color = factor(Y))) +
 ```
 
 ```{r}
-SPM_estimate <- SPM_training_Normal(X = dat1$X, Y = dat1$Y, Ts = Ts, b = b, alpha = alpha, alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+SPM_estimate <- SPM_training_Bernoulli(X = dat1$X, Y = dat1$Y, Ts = Ts, b = b, alpha = alpha, alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
 ```
 ```{r}
 SPM_prediction <- SPM_predicting_Bernoulli(X = dat2[["X"]], a = SPM_estimate$a, rho = SPM_estimate$rho, Ts = Ts, P = SPM_estimate$P)
