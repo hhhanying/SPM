@@ -145,7 +145,7 @@ if (model == "SPM"){
   
   library(e1071)
   f1 <- svm(factor(training[["Y"]]) ~ estimate[["U"]])
-  prediction <- predict(f1, U)
+  prediction <- predict(f1, Us)
   accuracy <- sum(as.numeric(prediction) == testing[["Y"]]) / Ntest
   print(accuracy)
   save.image(image_name)
