@@ -123,7 +123,7 @@ testing <- document_generator_Normal(a, rho, Ts, Lambda, Tau, Ntest, w, seed + 1
 print(model)
 if (model == "SPM"){
   # fit the model
-  estimate <- SPM_training_Normal(training[["X"]], training[["Y"]], Ts, b, rep(1, k0 + k1), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntrace, nchain, nskip) # uninformatve prior
+  estimate <- SPM_training_Normal(X = training[["X"]], Y = training[["Y"]], Ts = Ts, b = b, alpha = rep(1, k0 + k1), mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, VI = TRUE) # uninformatve prior
   # predict the labels
   prediction <- SPM_predicting_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, nsample, seed) 
   save.image(image_name)
@@ -132,14 +132,14 @@ if (model == "SPM"){
   print(accuracy)
   
   # estimate memberships
-  membership <- SPM_membership_Normal(testing[["X"]], prediction[["labels"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], Ts, ntrace, nchain, nskip)
+  membership <- SPM_membership_Normal(X = testing[["X"]], Y = prediction[["labels"]], Lambda = estimate[["Lambda"]], Mu = estimate[["Mu"]], a = estimate[["a"]], rho = estimate[["rho"]], Ts = Ts, VI = TRUE)
   save.image(image_name)
 } else{
   # fit the model
-  estimate <- BPM_training_Normal(training[["X"]], b, rep(1, K), mu_Mu, sigma2_Mu, alpha_Lambda, beta_Lambda, ntopic, ntrace, nchain, nskip)
+  estimate <- BPM_training_Normal(X = training[["X"]], b = b, alpha = rep(1, K), mu_Mu = mu_Mu, sigma2_Mu = sigma2_Mu, alpha_Lambda = alpha_Lambda, beta_Lambda = beta_Lambda, ntopic = ntopic, VI = FALSE, nchain = 1)
   save.image(image_name)
   # estimate memberships for test set
-  Us <- BPM_membership_Normal(testing[["X"]], estimate[["Lambda"]], estimate[["Mu"]], estimate[["a"]], estimate[["rho"]], ntrace, nchain, nskip)
+  Us <- BPM_membership_Normal(X = testing[["X"]], Lambda = estimate[["Lambda"]], Mu = estimate[["Mu"]], a = estimate[["a"]], rho = estimate[["rho"]], VI = FALSE, nchain = 1)
   U <- Us
   save.image(image_name)
   
