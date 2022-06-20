@@ -98,7 +98,7 @@ get_parameters_Bernoulli <- function(P = NULL, logits = NULL, G = NULL, Ts = NUL
 #' 
 #' @param save_trace: default to be FALSE. If TRUE will also return the trace.
 #' @export
-SPM_training_Normal <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
+SPM_training_Bernoulli <- function(X, Y, Ts, b, alpha, alpha_p, beta_p, VI = FALSE, ntrace = 1000, nchain = 1, nskip = 2, seed = 1, save_trace = FALSE){
   SPM_Bernoulli_stancode <- "
   data {
     int<lower=0> dg;  // dim(membership)
