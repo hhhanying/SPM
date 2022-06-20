@@ -59,5 +59,19 @@ confi_path <- "../submit/configurations.csv"
 write.table(confi, file = confi_path, sep=",", row.names=FALSE)
 ```
 
-
+### configurations for submit file
+```{r}
+confi_path <- "../submit/configurations.csv"
+confi <- read.csv(confi_path)
+id <- 1:dim(confi)[1]
+memory <- case_when(confi$d == 50 ~ 4,
+                    confi$d == 200 ~ 11,
+                    confi$d == 800 ~ 18)
+disk <- case_when(confi$d == 50 ~ 15000,
+                    confi$d == 200 ~ 60000,
+                    confi$d == 800 ~ 240000)
+params <- data.frame(id = id, memory = memory, disk = disk)
+para_path <- "../submit/CHTC_params.txt"
+write.table(params, file = para_path, sep=",", row.names=FALSE, col.names = FALSE, quote = FALSE)
+```
 
