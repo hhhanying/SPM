@@ -1,0 +1,101 @@
+---
+title: "simulation"
+output: html_document
+params:
+  confi_index: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+confi_file <- "configurations.csv"
+confi_index <- as.numeric(params$confi_index)
+confi <- read.csv(confi_file)
+```
+
+```{r}
+library(tidyverse)
+theme_set(theme_minimal())
+source("R/shared.R")
+source("R/Normal.R")
+```
+
+```{r}
+model <- confi$model[confi_index]
+image_name <- paste0(model, confi_index, '.Rdata')
+load(image_name)
+```
+
+```{r}
+rownames(Mu) <- seq_len(nrow(Mu))
+rownames(estimate[["Mu"]]) <- seq_len(nrow(Mu))
+tmp <- list(Mu, estimate[["Mu"]])
+topic_match <- list()
+for (k in seq_len(nrow(Mu))) {
+  rho <- cor(t(tmp[[1]]), t(tmp[[2]]))
+  ix <- which(rho == max(rho), arr.ind = TRUE)
+  topic_match[[k]] <- c(rownames(tmp[[1]])[ix[1]], rownames(tmp[[2]])[ix[2]])
+  tmp[[1]] <- tmp[[1]][-ix[1],, drop=F]
+  tmp[[2]] <- tmp[[2]][-ix[2],, drop=F]
+}
+
+topic_match <- do.call(rbind, topic_match) %>%
+  as_tibble() %>%
+  set_names(c("k", "k_hat")) %>%
+  mutate(across(everything(), as.integer)) %>%
+  arrange(k)
+```
+
+```{r}
+Mu_df <- Mu %>%
+  as.data.frame() %>%
+  mutate(k = row_number()) %>%
+  pivot_longer(-k, values_to = "truth")
+
+M_hat_df <- estimate[["Mu"]][topic_match$k_hat, ] %>%
+  as.data.frame() %>%
+  mutate(k = row_number()) %>%
+  pivot_longer(-k, values_to = "estimate")
+
+Mu_df <- Mu_df %>%
+  left_join(M_hat_df)
+
+```
+
+If I understand the labeling correctly, the shared topics seem well-estimated.
+The unshared topics are not well estimated.
+
+```{r}
+ggplot(Mu_df) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  geom_point(aes(truth, estimate), size = 0.5, alpha = 0.8) + 
+  facet_wrap(~ k)
+```
+
+What basis do we have for prediction? In truth, there is a clear distinction
+between $Y$'s based on U.
+
+```{r}
+data.frame(Y = training$Y, U = training$U) %>%
+  ggplot() +
+    geom_point(aes(U.1, U.2, col = as.factor(Y)))
+
+data.frame(Y = training$Y, U = princomp(training$U)$score) %>%
+  ggplot() +
+  geom_point(aes(U.Comp.1, U.Comp.2, col = as.factor(Y)))
+```
+
+But the estimated $G$ does not give a few of this at all.
+
+```{r}
+data.frame(G = estimate$G, Y = training$Y) %>%
+  ggplot() +
+  geom_point(aes(G.1, G.2, col = as.factor(Y)))
+
+data.frame(G = princomp(estimate$G)$scores, Y = training$Y) %>%
+  ggplot() +
+  geom_point(aes(G.Comp.1, G.Comp.2, col = as.factor(Y)))
+```
+
