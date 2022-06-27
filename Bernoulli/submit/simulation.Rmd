@@ -48,7 +48,7 @@ nskip <- 2
 nsample <- 1000
 
 Ntrain <- 100
-Ntest <- 100
+Ntest <- 50
 ```
 
 ```{r}
@@ -85,8 +85,9 @@ training <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = Ntrain, 
 testing <- document_generator_Bernoulli(a = a, rho = rho, Ts = Ts, N = Ntest, P = P, seed = seed + 1)
 ```
 ```{r}
+flag <- 0
 if (model == "SPM"){
-  estimate <- SPM_training_Bernoulli(X = training$X, Y = training$Y, Ts = Ts, b = b, alpha = rep(1, k0 + k1), alpha_p = alpha_p, beta_p = beta_p, VI = TRUE)
+  estimate <- SPM_training_Bernoulli(X = training$X, Y = training$Y, Ts = Ts, b = b, alpha = rep(1, k0 + k1), alpha_p = alpha_p, beta_p = beta_p, VI = FALSE, nchain = 1)
 
   prediction <- SPM_predicting_Bernoulli(X = testing[["X"]], a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P)
   save.image(image_name)
@@ -94,23 +95,25 @@ if (model == "SPM"){
   accuracy <- sum(prediction[["labels"]] == testing[["Y"]]) / Ntest
   print(accuracy)
   
-  membership <- SPM_membership_Bernoulli(X = testing$X, Y = prediction$labels, a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P, VI = TRUE )
-  
+  # membership <- SPM_membership_Bernoulli(X = testing$X, Y = prediction$labels, a = estimate$a, rho = estimate$rho, Ts = Ts, P = estimate$P, VI = FALSE, nchain = 1 )
+  flag <- 1
   save.image(image_name)
 }else{
-  estimate <- BPM_training_Bernoulli(X = training$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = FALSE)
+  estimate <- BPM_training_Bernoulli(X = training$X, b = b, alpha = rep(1, ntopic), alpha_p = alpha_p, beta_p = beta_p, ntopic = ntopic, VI = FALSE, nchain = 1)
   save.image(image_name)
-  membership <-  BPM_membership_Bernoulli(X = testing$X, a = estimate[["a"]], rho = estimate[["rho"]], P = estimate[["P"]], VI = TRUE)
+  membership <-  BPM_membership_Bernoulli(X = testing$X, a = estimate[["a"]], rho = estimate[["rho"]], P = estimate[["P"]], VI = FALSE, nchain = 1)
   save.image(image_name)
   
-  svm_BPM <- svm(factor(training[["Y"]]) ~ estimate[["U"]])
-  prediction <- predict(svm_BPM, membership[["U"]]) == factor(testing[["Y"]])
-  accuracy <- sum(prediction == factor(testing[["Y"]])) / Ntest
-  print(accuracy)
-  
+  train <- data.frame(Y = factor(training[["Y"]]), estimate[["U"]])
+  test <- data.frame(Y = factor(testing[["Y"]]), membership[["U"]])
+  svm_BPM <- svm(Y ~ ., data = train)
+  prediction <- predict(svm_BPM, newdata = test[-1])
+  accuracy <- sum(prediction == test[[1]]) / Ntest
+  flag <- 1
   save.image(image_name)
 
 }
+
 ```
 
 
