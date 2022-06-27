@@ -9,16 +9,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 nlabel <- 5
-topic_d_ratio <- 0.2
+topic_d_ratio <- 0.04
 ds <- c()
 k0s <- c()
 k1s <- c()
 for (d in c(50, 200, 800)){
-  K <- floor(d * topic_d_ratio) # number of total topics
-  max_k0 <- K %/% nlabel
-  ds <- c(ds, rep(d, max_k0))
-  k0s <- c(k0s, 1:max_k0)
-  k1s <- c(k1s, seq(K - nlabel, 0, by = -5))
+  K <- floor(d * topic_d_ratio) + 1 # number of total topics
+  max_k0 <- K
+  tem_d <- rep(d, max_k0)
+  tem_k0 <- 1:max_k0
+  tem_k1 <- K - tem_k0
+  ds <- c(ds, tem_d)
+  k0s <- c(k0s, tem_k0)
+  k1s <- c(k1s, tem_k1)
 }
 confi <- data.frame(d = ds, k0 = k0s, k1 = k1s, seed = 1:length(ds))
 
@@ -37,7 +40,7 @@ prior <- data.frame(
 
 model <- c("SPM", "BPM")
 
-C <- 20
+C <- 0.5
 
 confi <- expand_grid(confi, weight_shared, balanced, prior, model) %>%
   mutate(
@@ -56,11 +59,11 @@ confi_path <- "../submit/configurations.csv"
 confi <- read.csv(confi_path)
 id <- 1:dim(confi)[1]
 memory <- case_when(confi$d == 50 ~ 3.5,
-                    confi$d == 200 ~ 10,
-                    confi$d == 800 ~ 15)
-disk <- case_when(confi$d == 50 ~ 5000,
-                    confi$d == 200 ~ 10000,
-                    confi$d == 800 ~ 20000)
+                    confi$d == 200 ~ 5,
+                    confi$d == 800 ~ 8)
+disk <- case_when(confi$d == 50 ~ 140000,
+                    confi$d == 200 ~ 200000,
+                    confi$d == 800 ~ 30000)
 params <- data.frame(id = id, memory = memory, disk = disk)
 para_path <- "../submit/CHTC_params.txt"
 write.table(params, file = para_path, sep=",", row.names=FALSE, col.names = FALSE, quote = FALSE)
