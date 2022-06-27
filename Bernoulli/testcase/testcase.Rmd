@@ -97,9 +97,16 @@ U_VI2 <- BPM_membership_Bernoulli(X = dat2[["X"]], a = BPM_estimate2[["a"]], rho
 corrplot::corrplot(cor(t(U(dat2[["G"]], dat2[["Y"]], Ts))))
 corrplot::corrplot(cor(t(U_VI2[["U"]])))
 
+d1 <- data.frame(BPM_estimate2[["U"]], Y = factor(dat1[["Y"]]))
+d2 <- data.frame( U_VI2[["U"]], Y = factor(dat2[["Y"]]))
+svm_VI2 <- svm(Y ~., data = d1) 
+sum(predict(svm_VI2, newdata = d2[-3]) == d2[[3]])
+
 svm_VI2 <- svm(factor(dat1[["Y"]]) ~ BPM_estimate2[["U"]]) # train SVM
 sum(predict(svm_VI2, BPM_estimate2[["U"]]) == factor(dat1[["Y"]])) # 88
-sum(predict(svm_VI2, U_VI2[["U"]]) == factor(dat2[["Y"]])) # 39
+sum(predict(svm_VI2, U_VI2[["U"]]) == factor(dat2[["Y"]])) # 86
+
+
 
 ```
 
