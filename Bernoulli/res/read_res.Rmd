@@ -1,0 +1,35 @@
+---
+title: "read_res"
+output: html_document
+date: '2022-06-20'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+confi_file <- "../submit/configurations.csv"
+res <- read.csv(confi_file)
+```
+
+```{r}
+res$accuracy <- NA
+for(ii in 1:dim(confi)[1]){
+  model <- res$model[ii]
+  image_name <- paste0("../submit/", model, ii, '.Rdata')
+  if(file.exists(image_name)){
+    print(ii)
+    print(image_name)
+    load(image_name)
+    if(model == "BPM" & !is.list(prediction)){
+      accuracy <- sum(prediction) / 100
+    }
+    print(accuracy)
+    res$accuracy[ii] <- accuracy
+  }
+}
+```
+
