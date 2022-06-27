@@ -1,0 +1,26 @@
+---
+title: "read_res_Normal"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+confi_file <- "../submit/configurations.csv"
+res <- read.csv(confi_file)
+res$accuracy <- NA
+for(ii in 1:dim(confi)[1]){
+  model <- res$model[ii]
+  image_name <- paste0("../submit/", model, ii, '.Rdata')
+  if(file.exists(image_name)){
+    print(ii)
+    print(image_name)
+    load(image_name)
+    print(accuracy)
+    res$accuracy[ii] <- accuracy
+  }
+}
+```
+
